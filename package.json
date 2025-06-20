@@ -1,0 +1,25 @@
+{
+    "name": "tinya",
+    "version": "0.1.0",
+    "description": "",
+    "main": "src/index.ts",
+    "scripts": {
+        "build": "node build.mjs",
+        "dev:build": "node build.mjs -w",
+        "dev:serve": "python3 -m http.server",
+        "dev": "pnpm run \"/^dev:.*/\"",
+        "lint": "tsc"
+    },
+    "keywords": [],
+    "author": "dragoncoder047",
+    "license": "GPL-3.0-only",
+    "devDependencies": {
+        "esbuild": "^0.25.0",
+        "typescript": "^5.6.2"
+    },
+    "pnpm": {
+        "onlyBuiltDependencies": [
+            "esbuild"
+        ]
+    }
+}

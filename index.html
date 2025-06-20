@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <title>TinyA test</title>
+        <style>
+            textarea {
+                font-family: "Fira Code", monospace;
+            }
+
+            canvas {
+                image-rendering: pixelated;
+                image-rendering: crisp-edges;
+                image-rendering: -moz-crisp-edges;
+                image-rendering: -webkit-optimize-contrast;
+            }
+        </style>
+    </head>
+
+    <body>
+        <h1>TinyA test</h1>
+        <p><a href="https://github.com/dragoncoder047/tinya#tab-readme">(What is this?)</a></p>
+        <p><button id="play">Play</button></p>
+        <p>Instrument: <textarea id="instrument" rows="2" cols="100">[[],[u,[w,110,1],3,.05],[-1,-0]]</textarea></p>
+        <p>Channels: <textarea id="channels" rows="2" cols="100">[[a,.02,.1,1,.5]]</textarea></p>
+        <canvas id="oscilloscope" width="800" height="200"></canvas>
+        <pre id="log"></pre>
+        <script type="module">
+            import * as tinya from "./build/tinya.js";
+
+            const playBtn = document.getElementById("play");
+            const instrumentArea = document.getElementById("instrument");
+            const channelsArea = document.getElementById("channels");
+            const log = document.getElementById("log");
+            const canvas = document.getElementById("oscilloscope");
+            const canvasCtx = canvas.getContext("2d");
+            const audioCtx = new AudioContext;
+            var player;
+
+            const nodes = {
+                a: tinya.adsrNode,
+                w: tinya.zzfxOscillator,
+                b: tinya.bitcrusher,
+                f: tinya.biquadFilter,
+                s: tinya.shimmerer,
+                d: tinya.delay,
+            };
+            const macros = {
+                u: tinya.unisons,
+                c: tinya.combFilter
+            };
+            const channelMacros = {
+                a: tinya.makeADSRChannel
+            };
+
+            playBtn.addEventListener("click", () => {
+                audioCtx.resume();
+                log.textContent = "";
+                try {
+                    const instrumentValue = tinya.minparse(instrumentArea.value);
+                    const channelsValue = tinya.minparse(channelsArea.value);
+                    const instrumentExpanded = tinya.macroexpand(instrumentValue, macros);
+                    console.log("expanded instrument:", instrumentExpanded);
+                    const instrument = tinya.compileInstrument(instrumentExpanded, nodes);
+                    console.log("compiled instrument:", instrument);
+                    log.textContent = tinya.debugDumpInstrument(instrument, nodes);
+                    const channels = tinya.macroexpand(channelsValue, channelMacros);
+                    const durations = channels.map(c => tinya.channelDuration(c));
+                    const duration = Math.max(...durations);
+                    const samples = tinya.buildSamples(instrument, channels, duration);
+                    drawSamples(samples, canvas, canvasCtx);
+                    const bufferNode = tinya.toBufferNode(samples, audioCtx);
+                    log.style.color = "black";
+                    bufferNode.connect(audioCtx.destination);
+                    player?.stop();
+                    player = bufferNode;
+                    bufferNode.start();
+                } catch (e) {
+                    log.textContent += e.stack ?? e.message ?? e;
+                    log.style.color = "red";
+                    throw e;
+                }
+            });
+
+            function drawSamples(samples, canvas, ctx) {
+                const ratio = window.devicePixelRatio || 1;
+                const width = canvas.width = (canvas.style.width = 500) * ratio;
+                const height = canvas.height = (canvas.style.height = 100) * ratio;
+                ctx.strokeStyle = "black";
+                ctx.lineWidth = 1;
+                ctx.imageSmoothingEnabled = false;
+                ctx.clearRect(0, 0, width, height);
+                ctx.beginPath();
+                ctx.moveTo(0, height / 2);
+                for (let i = 0; i < samples.length; i++) {
+                    const x = (i / samples.length) * width;
+                    const y = (samples[i] + 1) * height / 2;
+                    ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+            }
+        </script>
+    </body>
+
+</html>
