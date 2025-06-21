@@ -5,7 +5,7 @@ export const unisons = (oscTemplate: NodeTree, voices = 1, spread = 0, offset = 
     const out: Partial<NodeTree> = [];
     const baseFreq = oscTemplate[freqIndex];
     for (var i = 1; i <= voices; i++) {
-        const offsetSemitones = offset + spread * (i - 1) / voices;
+        const offsetSemitones = offset + spread * (2 * (i - 1) / (voices - 1) - .5);
         const offsetFactor = Math.pow(2, offsetSemitones / 12);
         out[i] = oscTemplate.with(freqIndex, isNumber(baseFreq) ? baseFreq * offsetFactor : [[], baseFreq, offsetFactor]);
         if (i > 1 && sign !== 1) out[i] = [[], sign, out[i]];
