@@ -27,21 +27,21 @@ When the sound is to be played, the remaining inputs to the graph are filled wit
 
 The graph is defined as a nested list structure. Each node is written as the node type specifier, followed by its inputs.
 
-The node type specifier can be one of four things:
+The node can optionally start with a string beginning with `=`. This names the node, which enables it to be referenced by other nodes. This is removed if present, and then the rest of the array is processed as if it was a normal unnamed node.
+
+The node type specifier can be one of two things:
 
 1. A string. This specifies the type of the node, initialized with no arguments.
 2. An array with a string as the first element. This specifies both the type of the node and the arguments used to initialize it (Some nodes have initialization-time arguments that can't be passed in as a audio-rate parameter.)
-3. undefined or null. This represents a **averaging** mixer (sum of inputs / length of inputs).
-4. An empty array. This represents a **multiplying** gain stage (which can also be abused as a ring modulator).
 
 Each of the parameter values (which come after the function) can be one of four things:
 
-1. A constant number, undefined, or null. This is just fed into the parameter as-is for the entire duration of the sound. Null is replaced with zero; undefined is left as-is (the function may have another default).
-2. Another node. This is an array with a function, null, or undefined as its first element, and the rest are (recursively) one of these too.
-3. A relative fanout or back reference. This is a list with a number as the first argument. If the first number is negative, this specifies the number of levels in the tree to walk down (which could create a cyclic backreference); the rest of the numbers must all be greater than 0 and specify the index of the parameter to walk into when walking back up the tree (0 means the node itself which is not valid); the selected node's output is then used as this parameter. **If you specify an invalid reference path TinyA will silently replace it with undefined... you have been warned...**
-4. A reference to an external input channel. This specified as a two-element array, the first element is a negative number, and the second element is a negative number that is the negative of the index of the input shaper. The first number is currently not used, it just has to be negative to distinguish it from case 3 (where *only* the first element can be negative).
+1. Another node. This is an array with a name or function ID as its first element, and the rest are (recursively) one of these too.
+2. A reference to another node, which is the name the node was named with but starting with `.` instead of `=`.
+3. A reference to an external input channel. This is the same as referencing a node except it starts with `>`.
+4. A constant number, undefined, null, or a string that doesn't start with `.`, `=`, or `>`. This is just fed into the parameter as-is for the entire duration of the sound. Null is replaced with zero; undefined is left as-is (the function may have another default).
 
-Note: if you create a back-reference to a node lower in the tree (that will be evaluated after the parameter is needed), the parameter value will be zero for the first sample and then it will be the value computed on the previous sample. TinyA will not do anything about this.
+Note: if you use names to reference to a node lower in the tree (that will be evaluated after the parameter is needed), the parameter value will be zero for the first sample and then it will be the value computed on the previous sample. TinyA will not do anything about this.
 
 For example:
 
@@ -49,21 +49,22 @@ For example:
 [
     "f", // filter node
     [ // filter cutoff frequency
-        [], // gain node
+        "g", // gain node
         -1000, // base value (of frequency)
         [ // multiplied by
             "e", // envelope node
-            [-2, 2] // go up 2 levels and get parameter #2 (which is value of other gain node)
+            ".wah", // get value of node named "wah" below
         ]
     ],
     [ // audio input to filter
-        [], // gain node
-        [-1, -1], // gain value = channel #1
+        "=wah", // name node "wah"
+        "g", // gain node
+        ">expression", // gain value = expression input channel
         [ // audio input value
             "u", // unison macro
             [ // wave 1
                 "w", // wave node
-                [-1, -0], // frequency = channel #0
+                ">pitch", // frequency = input pitch channel
             ],
             3, // num voices
             .05, // semitones offset between voices
@@ -73,6 +74,8 @@ For example:
 ```
 
 ## Notation of Input Channel
+
+<!-- TODO: rework this all !!!!!!! -->
 
 The input channel list is most likely used for stuff like pitch bend, articulation, tempo, EQ, and envelope, but it's not locked to anything like that.
 
@@ -121,25 +124,27 @@ For example:
 This is a thin wrapper around JSON.parse() that adds a few enhancements: it applies a few transformations to the output to greatly compress it (replacing `0.1` with `.1`, changing `true` to `!0` and `false` to `!1`, removing the quotes around alpabetic strings) as well as a tweak that allows both positive and negative zero to be stringified and parsed correctly.
 
 **`tinya.macroexpand(object, macros)` -> macro-expanded object<br>**
-`macros` is an object mapping macro names to their implementation (which is just a function). This will recursively walk the tree of the object (where each node is an array; objects aren't walked into) and if the first element of the array is a string that is the name of a macro, it will call the macro function with the rest of the elements as arguments; if it doesn't name a macro it will recurse on all of the elements and return the modified array.
+`macros` is an object mapping macro names to their implementation (which is just a function). This will recursively walk the tree of the object (both objects and arrays are walked into) and if it's an array and the first element is a string that is the name of a macro, it will call the macro function with the rest of the elements as arguments; if it doesn't name a macro it will recurse on all of the elements and return the modified array. If the macro returns another container type, macroexpand will be called recursively on whatever the macro returned.
 
 **`tinya.compileInstrument(instrument, nodeDefs, sampleRate=44100)` -> compiled instrument array<br>**
-This just "compiles" the instrument down into a representation that is a little faster to run (it will be run once for each sample, and we're potentially generating *thousands* of samples). `nodeDefs` is a mapping of node name to the factor function that creates it. The factory function will get the sample rate as its first parameter, and the remaining arguments are whatever was given in the node definition (case 2 for the head). The factory must return another function that implements the node's DSP code. This will be called once for each sample, with the sample number as the first parameter, and the rest of the parameters are the arguments specified in the node definition (which may be an input sample, a control parameter, etc. and this only depends on the node definition, TinyA doesn't care what these actually mean).
+This just "compiles" the instrument down into a representation that is a little faster to run (it will be run once for each sample, and we're potentially generating *thousands* of samples). `nodeDefs` is a mapping of node name to the factory function that creates it. The factory function will get the sample rate as its first parameter, and the remaining arguments are whatever was given in the node definition (case 2 for the head). The factory must return another function that implements the node's DSP code. This will be called once for each sample, with the sample number as the first parameter, and the rest of the parameters are the arguments specified in the node definition (which may be an input sample, a control parameter, etc. and this only depends on the node definition, TinyA doesn't care what these actually mean).
 
 **`tinya.channelDuration(channel)` -> length of channel in seconds<br>**
 Given a channel array as specified above, takes all of the time values from each slice and returns their sum which is the total amount of time that the channel will be active.
 
 **`tinya.buildSamples(instrument, channels, duration, sampleRate=44100)` -> array of samples<br>**
-`instrument` is the thing that compileInstrument() returned. `channels` is the array of input channels. Due to how it's implemented (currently) channels can reference other channels only if the referenced channel is *before* the one that references it. `duration` is in seconds.
+`instrument` is the thing that compileInstrument() returned. `channels` is a mapping of channel name to channel array. `duration` is in seconds.
 
 **`tinya.toBufferNode(samples, audioCtx, sampleRate=44100)` -> AudioBufferSourceNode<br>**
-Puts the samples into a Web Audio buffer node and returns it. The node isn't connected to anything and isn't started automatically. To play it directly call `node.connect(audioCtx.destination); node.start();`. For stereo output the samples parameter can also be a 2-element array with 2 arrays of samples.
+Puts the samples into a Web Audio buffer node and returns the audio node. The node isn't connected to anything and isn't started automatically. To play it directly call `node.connect(audioCtx.destination); node.start();`. For stereo output the samples parameter can also be a 2-element array with 2 arrays of samples but there's nothing here that uses that yet.
 
 (TODO: write the predefined node types, macros, etc. here)
 
 ---
 
 # Everything below this line is unimplemented and will be moved above it once it's added
+
+so I joined the [beepbox modding discord server](https://discord.com/invite/Tc997TstJb) and i guess if you have any questions about this repository you can ask them there
 
 ## consider these TODO items
 
@@ -197,30 +202,20 @@ As TinyA is intended to create not only sound effects, but music, there are spec
 
 * Remove all the places where negative zero is used so TinyA can be ported to languages that don't have signed zeros.
 
-* Give the input channels as an object rather than an array. This would obviously force them to be named (you could still pass an array and then the names would be the indices). They would then be able to reference channels after them (how)?
-
-* Implement the unisons macro the same way BeepBox does it. I can't tell because synth.ts is so long I can't find the relevant code.
-
 * Implement a generalized FM instrument macro (also once I figure out how BeepBox does it).
 
 * Have a node that converts MIDI note number into frequency
     * This would kind of fix it to 12-EDO because it would need extremely ugly decimals for microtonal that is not a multiple of 12
         * Auto-fraction may fix this, the fractions might work out nice. Or not.
 
-* Put the adding mixer back to straight sum (rather than average)? Or have a third "implicit" node type for both?
-
-* Define the "core" nodes as an export object (this would permanently fix the names of them, must choose wisely) **<----- THIS IS A GOOD IDEA**
-
 * Make the "compressed JSON" parser able to parse fractions like 1/16 so people can more easily hand-write stuff without having to break out a calculator (also `.0625` is a tad longer than `1/16` and gets worse as the fraction gets smaller). Maybe also have the stringifier detect likely fractions and do this too. [Relevant StackOverflow question](https://stackoverflow.com/questions/26643695/converting-a-floating-point-decimal-value-to-a-fraction)
 
 * Make TinyA capable of streaming output (being able to play some sound before all samples are generated). Need to figure out how to reify buildSamples' internal state.
 
-* Instead of the relative referencing for multiple-output or backreference node connections, have some way to name nodes with strings. The issue with the current way is if the reference is intended to cross from inside a macro to outside of the macro, the author could inadvertently forget that it's a macro and treat it as a node, but the macro adds levels, so the reference goes somewhere unintended (or just breaks).
-
-    Considering that strings are largely meaningless outside of a node name context, this is probably possible somehow if restrictions on node names are imposed; then the names can be strings that don't fit that restriction.
-
 * Be able to specify more than one channel value in the same array. This would be conducive to, say, encoding an entire track of a song (note pitch, articulation, dynamics, "muting" a horn, etc.) with the values at the same timestep right next to each other in the array, and the lengths are re-used, so stuff stays in sync.
     * This would mean that the single channel outputs an array, so the input reference needs to specify which index (possibly using the first number)
+        * It could just be a macro that outputs things
+        * Either that or the outputs of the channel have to be named
 
 * Implement a few more nodes to allow me to implement the rest of the functionality of ZzFX so that TinyA can act as a backend of ZzFX compatibility.
 

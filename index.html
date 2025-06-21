@@ -19,10 +19,11 @@
 
     <body>
         <h1>TinyA test</h1>
-        <p><a href="https://github.com/dragoncoder047/tinya#tab-readme">(What is this?)</a></p>
+        <p><a href="https://github.com/dragoncoder047/tinya?tab=readme-ov-file">(What is this?)</a></p>
         <p><button id="play">Play</button></p>
-        <p>Instrument: <textarea id="instrument" rows="2" cols="100">[[],[u,[w,110,1],3,.05],[-1,-0]]</textarea></p>
-        <p>Channels: <textarea id="channels" rows="2" cols="100">[[a,.02,.1,1,.5]]</textarea></p>
+        <!-- comb filter shriek [combfilter,[gain,.5,[wave,100,1],>env],.001,1.003] -->
+        <p>Instrument: <textarea id="instrument" rows="2" cols="100">[gain,[unison,[wave,110,1],3,.05],>env]</textarea></p>
+        <p>Channels: <textarea id="channels" rows="2" cols="100">{env:[a,.02,.1,1,.5]}</textarea></p>
         <canvas id="oscilloscope" width="800" height="200"></canvas>
         <pre id="log"></pre>
         <script type="module">
@@ -37,18 +38,6 @@
             const audioCtx = new AudioContext;
             var player;
 
-            const nodes = {
-                a: tinya.adsrNode,
-                w: tinya.zzfxOscillator,
-                b: tinya.bitcrusher,
-                f: tinya.biquadFilter,
-                s: tinya.shimmerer,
-                d: tinya.delay,
-            };
-            const macros = {
-                u: tinya.unisons,
-                c: tinya.combFilter
-            };
             const channelMacros = {
                 a: tinya.makeADSRChannel
             };
@@ -59,13 +48,15 @@
                 try {
                     const instrumentValue = tinya.minparse(instrumentArea.value);
                     const channelsValue = tinya.minparse(channelsArea.value);
-                    const instrumentExpanded = tinya.macroexpand(instrumentValue, macros);
+                    const instrumentExpanded = tinya.macroexpand(instrumentValue, tinya.builtinMacros);
                     console.log("expanded instrument:", instrumentExpanded);
-                    const instrument = tinya.compileInstrument(instrumentExpanded, nodes);
+                    const instrument = tinya.compileInstrument(instrumentExpanded, tinya.builtinNodes);
                     console.log("compiled instrument:", instrument);
-                    log.textContent = tinya.debugDumpInstrument(instrument, nodes);
+                    log.textContent = tinya.debugDumpInstrument(instrument, tinya.builtinNodes);
+                    console.log("channels value:", channelsValue);
                     const channels = tinya.macroexpand(channelsValue, channelMacros);
-                    const durations = channels.map(c => tinya.channelDuration(c));
+                    console.log("expanded channels:", channels);
+                    const durations = Object.values(channels).map(c => tinya.channelDuration(c));
                     const duration = Math.max(...durations);
                     const samples = tinya.buildSamples(instrument, channels, duration);
                     drawSamples(samples, canvas, canvasCtx);
@@ -73,8 +64,7 @@
                     log.style.color = "black";
                     bufferNode.connect(audioCtx.destination);
                     player?.stop();
-                    player = bufferNode;
-                    bufferNode.start();
+                    (player = bufferNode).start();
                 } catch (e) {
                     log.textContent += e.stack ?? e.message ?? e;
                     log.style.color = "red";

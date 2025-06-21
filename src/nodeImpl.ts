@@ -10,8 +10,20 @@ import {
     TAU,
     tri
 } from "./math";
+import { NodeImpl, NodeImplFactory } from "./types";
 
-/** ZzFX oscillator. No tremolo, modulation, ADSR, filter, bitcrusher, or echo. */
+
+/** constant node - discards all its inputs and returns the value passed to the constructor */
+export const constant = (_: number, num: number): NodeImpl => () => num;
+
+/** summing mixer - sums all its inputs and returns the result (0 if no inputs) */
+export const summingMixer = (): NodeImpl => (_, ...args) => args.reduce((a, b) => a + b, 0);
+/** gain mixer - multiplies all its inputs and returns the result (1 if no inputs) */
+export const gainMixer = (): NodeImpl => (_, ...args) => args.reduce((a, b) => a * b, 1);
+
+
+/** ZzFX oscillator with 5th power noise. No tremolo, modulation, ADSR, filter, bitcrusher, or echo.
+ * Shape is 0 = sine, 1 = triangle, 2 = sawtooth, 3 = tan (sounds like 2x frequency), 4 = cube noise. */
 export const zzfxOscillator = (sampleRate: number) => {
     var phase = 0;
     return (sampleNo: number, frequency: number, shape: number, shapeCurve = 1, noise = 0, phaseOffset = 0) => {
@@ -26,7 +38,6 @@ export const zzfxOscillator = (sampleRate: number) => {
 export const biquadFilter = (sampleRate: number, quality = 2) => {
     var x2 = 0, x1 = 0, y2 = 0, y1 = 0;
     return (_: any, filter: number, sample: number) => {
-        console.log("biquadFilter", filter, sample);
         // basically copied from ZzFX
         var w = TAU * abs(filter) * 2 / sampleRate,
             cos_ = cos(w), alpha = sin(w) / 2 / quality,
@@ -41,8 +52,13 @@ export const biquadFilter = (sampleRate: number, quality = 2) => {
 /** Bit crush in num samples */
 export const bitcrusher = () => {
     var phase = 0, curSample = 0;
-    return (_: any, crushSamples: number = 0, sample: number) =>
-        (crushSamples > 0 && (phase = (phase + 1) % (crushSamples | 0)) >= 1) ? curSample : (curSample = sample);
+    return (_: any, crushSamples: number = 0, sample: number) => {
+        if (++phase >= crushSamples) {
+            phase = 0;
+            curSample = sample;
+        }
+        return curSample;
+    }
 }
 
 
@@ -53,6 +69,7 @@ export const delay = (sampleRate: number, delayTime: number) => {
     const buffer: number[] = new Array(delaySamples).fill(0);
     var i = 0;
     return (_: any, sample: number, feedbackGain = 0) => {
+        // TODO: variable delay time (if less than buffer length, advance read in next line by bufLen-delayTime samples, if too long resize buffer)
         const output = buffer[i]!;
         buffer[i] = sample + output * feedbackGain;
         i = (i + 1) % delaySamples;
@@ -71,3 +88,16 @@ export const shimmerer = (_: any) => {
         return out;
     }
 }
+
+
+// MAIN EXPORTS OBJECT
+export const builtinNodes: Record<string, NodeImplFactory> = {
+    gain: gainMixer,
+    ringmod: gainMixer, // ring modulator is just a multiplicative gain mixer lol
+    add: summingMixer,
+    wave: zzfxOscillator,
+    filter: biquadFilter,
+    bitcrush: bitcrusher,
+    delay: delay,
+    shimmer: shimmerer,
+};

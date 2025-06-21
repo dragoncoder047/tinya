@@ -1,9 +1,13 @@
-import { isArray, isString } from "./utils";
+import { any, isArray, isNull, isNumber, isObject, isString, isUndefined, mapObject } from "./utils";
 
-type MacroExpander<T extends Array<any>> = (...args: T) => T;
-export const macroexpand = <T extends Array<any>, M extends string>(tree: T, macros: Record<M, MacroExpander<T>>): T =>
-    !isArray(tree)
+type MacroExpander = (...args: any) => any;
+export const macroexpand = (tree: any, macros: Record<string, MacroExpander>): any => {
+    var temp;
+    return any(tree, isString, isNumber, isUndefined, isNull)
         ? tree
-        : isString(tree[0]) && tree[0] in macros
-            ? macros[tree[0] as M](...tree.slice(1) as T)
-            : tree.map(el => macroexpand(el, macros)) as T;
+        : !isArray(tree)
+            ? mapObject(tree, v => macroexpand(v, macros))
+            : isString(tree[0]) && tree[0] in macros
+                ? (any(temp = macros[tree[0]]!(...tree.slice(1)), isArray, isObject) ? macroexpand(temp, macros) : temp)
+                : tree.map(el => macroexpand(el, macros));
+}

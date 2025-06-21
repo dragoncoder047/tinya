@@ -1,4 +1,4 @@
-import type { NodeImpl } from "./types";
+import type { ChannelImpl, NodeImpl } from "./types";
 
 const interpolationFunction = (t: number, p: number = 1, a: number, b: number, d: number) =>
     d > 0 ? (p < 0 ? (b + (a - b) * ((d - t) / d) ** -p) : (a + (b - a) * (t / d) ** p)) : b;
@@ -20,7 +20,7 @@ const splitTimings = (channel: Channel, sampleRate: number): [number[], number[]
     return [dts, ts, ps, vals];
 }
 
-export const standardChannel = (sampleRate: number, channel: Channel): NodeImpl => {
+export const standardChannel = (sampleRate: number, channel: Channel): ChannelImpl => {
     const [dts, ts, ps, vals] = splitTimings(channel, sampleRate);
     var i = 0;
     return (sampleNo: number) => {
@@ -34,7 +34,7 @@ export const standardChannel = (sampleRate: number, channel: Channel): NodeImpl 
 export const makeADSRChannel = (attack = 0, decay = 0, sustain = 0, sustainVol = 1, release = .1, gateChannel = 0, behavior = 5): Channel =>
     [...(sustain < 0 ? [, -gateChannel, behavior] : []), attack, , 1, decay, , sustainVol, sustain, , sustainVol, release]
 
-export const adsrNode = (sampleRate: number, ...params: Parameters<typeof makeADSRChannel>): NodeImpl => {
+export const adsrNode = (sampleRate: number, ...params: Parameters<typeof makeADSRChannel>): ChannelImpl => {
     return standardChannel(sampleRate, makeADSRChannel(...params));
 }
 
