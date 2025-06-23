@@ -10,8 +10,6 @@ export const isUndefined = is("undefined") as (x: any) => x is undefined;
 export const isString = is("string") as (x: any) => x is string;
 export const isNull = (x: any): x is null => x === null;
 export const isEmpty = (x: any[]): x is [] => x.length === 0;
-export const isNegativeZero = (x: number): x is -0 => Object.is(x, -0);
-export const isNotNegative = (x: number) => (x > 0) || ((x === 0) && !isNegativeZero(x));
 type Predicate<T, U extends T> = (x: T) => x is U;
 type AssertedType<F> = F extends (x: any) => x is infer U ? U : never;
 type UnionOfPredicates<T, Fns extends readonly ((x: T) => x is any)[]> = AssertedType<Fns[number]>;
@@ -23,8 +21,9 @@ export const isObject = is("object") as (x: any) => x is Record<string, any>;
 // constant = null, undefined, number
 // node = [nodeType, ...arguments], or ["=nodeName", nodeType, ...arguments] for a named node
 // node with constructor parameters = [[nodeType, ...constructorArgs], ...arguments] or ["=nodeName", [nodeType, ...constructorArgs], ...arguments] for a named node
-// ref = "@nodeName"
+// ref = ".nodeName"
 // input ref = ">inputName"
+// input ref multi-channel = ">inputName.channelName"
 
 export const isConstant = (x: any): x is null | undefined | number | string => any(x, isNull, isUndefined, isNumber) || (isString(x) && !(isRef(x) || isNodeName(x) || isInputRef(x)));
 export const isNode = (x: any): x is NodeTree =>

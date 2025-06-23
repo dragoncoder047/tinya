@@ -1,6 +1,6 @@
 import { standardChannel, type Channel } from "./channel";
 import { type CompiledInstrument } from "./types";
-import { isInputRef, isNodeName, isNotNegative, isNumber, isRef, mapObject } from "./utils";
+import { isInputRef, isNodeName, isNumber, isRef, mapObject } from "./utils";
 
 export const buildSamples = (instrument: CompiledInstrument, channels: Record<string, Channel>, duration: number, sampleRate = 44100): number[] => {
     const samples: number[] = [],
@@ -34,10 +34,7 @@ export const buildSamples = (instrument: CompiledInstrument, channels: Record<st
                     stack.push(inst[0]);
                 else {
                     const [nodeIndex, numArgs] = inst;
-                    if (isNotNegative(nodeIndex))
-                        stack.push(nodes[nodeIndex]!(sampleNo, ...stack.splice(stack.length - numArgs!, numArgs)));
-                    else
-                        stack.push(channelValues[-nodeIndex]! ?? 0);
+                    stack.push(nodes[nodeIndex]!(sampleNo, ...stack.splice(stack.length - numArgs!, numArgs)));
                 }
             }
         }

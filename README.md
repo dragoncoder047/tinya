@@ -10,11 +10,6 @@ TinyA is inspired by [BeepBox][], [ZzFX][], and [ZzFXM][], and but is not relate
 [ZzFXM]: https://github.com/keithclark/ZzFXM
 [BeepBox]: https://github.com/johnnesky/beepbox
 
-> [!IMPORTANT]
-> If you want to port TinyA to another language, it **must** support IEEE-754 signed zeros. TinyA uses the sign bit to denote different behaviors even in places where the rest of the value can be zero. You have been warned.
->
-> Javascript does, but JSON does not, so TinyA provides its own encoding and decoding wrappers (see below).
-
 ## General topology
 
 To be able to create the maximum variety of sound effects, TinyA implements a highly configurable audio pipeline, which can create many different sound effects.

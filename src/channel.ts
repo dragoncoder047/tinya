@@ -1,4 +1,41 @@
-import type { ChannelImpl, NodeImpl } from "./types";
+import type { ChannelImpl } from "./types";
+
+/*
+
+this will get needed for the total length computation but whatever
+
+SymPy version of the interpolation function:
+
+a, b, d, t = symbols('a b d t', real=True, negative=False)
+p = symbols('p', real=True)
+f = Piecewise(
+    (b + (a - b) * ((d - t) / d) ** -p, And(d > 0, p < 0)),
+    (a + (b - a) * (t / d) ** p, And(d > 0, p >= 0)),
+    (b, True)
+)
+F = simplify(integrate(f, (t, 0, d)))
+F
+
+SymPy says this -->
+
+⎧             d⋅(-a + b⋅p)
+⎪             ────────────                             for p < 0
+⎪                p - 1
+⎪
+⎪  ⎛ p + 1                            ⎞
+⎨d⋅⎝0     ⋅(a - b) + a⋅(p + 1) - a + b⎠
+⎪──────────────────────────────────────  for (p > -1 ∧ p < 1) ∨ p > 1 ∨ p ≠ -1
+⎪                p + 1
+⎪
+⎪                 nan                                  otherwise
+⎩
+
+can simplify this to {
+    d * (a * p + b) / (p + 1) for p >= 0
+    d * (b * p + a) / (1 - p) for p < 0
+}
+
+*/
 
 const interpolationFunction = (t: number, p: number = 1, a: number, b: number, d: number) =>
     d > 0 ? (p < 0 ? (b + (a - b) * ((d - t) / d) ** -p) : (a + (b - a) * (t / d) ** p)) : b;
