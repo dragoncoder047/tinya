@@ -7,7 +7,7 @@ export type NodeHead = string;
 export type NodeTree = [NodeHead, ...NodeParameter[]] | [NodeName, NodeHead, ...NodeParameter[]];
 export type NodeName = `=${string}`; // named node, e.g. =osc1
 export type InputRef = `>${string}`; // input channel reference, e.g. >freq
-export type Ref = `.${string}`; // register reference, e.g. .osc1
+export type Ref = `@${string}`; // register reference, e.g. .osc1
 export type ChannelImpl = (sampleNo: number, channelValues?: Record<string, number>) => number;
 // ops are:
 // 2-pair [N, M] means call node N with M arguments popped from the stack

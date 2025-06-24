@@ -19,7 +19,7 @@ export const combFilter = (input: NodeTree, delayTime: number, feedbackGain: Nod
     const linkName = gensym("=combfilter_feed_");
     const outName = feedforward ? [] : [linkName];
     const inName = feedforward ? [linkName] : [];
-    return [...outName, "add", [...inName, "add", input], ["gain", feedbackGain, [["delay", delayTime], "." + linkName.slice(1)]]] as any;
+    return [...outName, "add", [...inName, "add", input], ["gain", feedbackGain, [["delay", delayTime], "@" + linkName.slice(1)]]] as any;
 }
 
 // TODO: reverb effect

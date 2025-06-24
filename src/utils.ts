@@ -21,7 +21,7 @@ export const isObject = is("object") as (x: any) => x is Record<string, any>;
 // constant = null, undefined, number
 // node = [nodeType, ...arguments], or ["=nodeName", nodeType, ...arguments] for a named node
 // node with constructor parameters = [[nodeType, ...constructorArgs], ...arguments] or ["=nodeName", [nodeType, ...constructorArgs], ...arguments] for a named node
-// ref = ".nodeName"
+// ref = "@nodeName"
 // input ref = ">inputName"
 // input ref multi-channel = ">inputName.channelName"
 
@@ -35,7 +35,7 @@ export const isNode = (x: any): x is NodeTree =>
 
 const isTypeString = <T extends string>(starter: T) => (x: any): x is `${T}${string}` =>
     isString(x) && x.startsWith(starter);
-export const isRef = isTypeString(".");
+export const isRef = isTypeString("@");
 export const isNodeName = isTypeString("=");
 export const isInputRef = isTypeString(">");
 export const isNamedNode = (x: any): x is [NodeName, ...any[]] => isArray(x) && isNodeName(x[0]);
