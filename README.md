@@ -177,8 +177,17 @@ As TinyA is intended to create not only sound effects, but music, there are spec
 * Optimize things, so that the "gain node" and "switch node" things are automatically recognized and the internal stack machine operation format can automatically skip updating the state of nodes that are known to not contribute to the final sample.
     * This may be harder than it looks because some nodes need to be continuously updated (which?)
 
+* Add "instrument instancing" where a sequence of instructions can be repeated for an array of values
+    * The note data input track would produce these
+    * Need to figure out how to create and destroy node templates and stuff
+    * Need to figure out how to define the transition type and how the already-initialized instruments can be reused
+        * "Normal" - strike each new note separately
+        * "Slide" / "Slide in pattern" - nonzero pitch bend slide time, configurable max step distance, it just finds the closest note pairs in the transition and automatically extends the notes and then adds pitch slide instructions
+        * "Interrupt" - reset effects envelopes except for ADSR, insert zero-length pitch slides
+        * "Continue" - completely merges the notes and gate signals etc
+
 * Output in stereo, by returning a 2-tuple instead of one sample as the bottom-most node
-    * have effects node that does this, by 
+    * have effects node that does this, by beepbox way (volume + short delay)
 
 * Implement a generalized FM instrument macro (also once I figure out how BeepBox does it).
 

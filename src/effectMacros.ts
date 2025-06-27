@@ -24,10 +24,19 @@ export const combFilter = (input: NodeTree, delayTime: number, feedbackGain: Nod
 
 // TODO: reverb effect
 
-// TODO: FM synthesis
+/*
+
+TODO: FM synthesis
+
+each operator = [freqMul, gain, modulatedBy or [modulatedBy, overrideGain], outGain, hzOffset]
+
+so for example: guitar defined as 1<-(2 3<-4), 1=~1x 100%, 2=1x 75%, 3=1x 60%, 4=~2x 25%, feedback = 1->2 25%
+would be: [[,,[2,3,4],1,5],[,.75,[[1,.25]],0],[,.25,[4],0,5],[2,.25,,0,5]]
+
+*/
 
 // MAIN MACROS OBJECT
 export const builtinMacros: Record<string, (...args: any[]) => NodeTree> = {
-    unison: unisons,
+    unison: unisons, // help me pls why are these name slightly different
     combfilter: combFilter,
 };

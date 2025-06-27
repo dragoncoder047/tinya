@@ -14,6 +14,23 @@ channel header:
         next header field is which input is the gate
         can only have 1 track, and a time value of -1 specifies hold while gate on
 
+what about multiple notes in the chord
+
+generalization of notes: each note entry is a list of time step, for each time event it has
+[pitch, expression] pairs like in a channel, and interpolation is the same, if undefined
+the interpolation step is omitted and it just takes the intermediate value from the surrounding
+defined events
+
+beepbox stores each of the notes vertically: there is only ever zero or one active Note at once
+in each channel, and the Note stores a list of base pitches. Then there is a list of NotePins
+that have the pitch bend and expression data and the pins apply to *all* of the notes in the chord
+simultaneously. This is kind of dumb because you should be able to have notes continue at the same time
+another note starts, as well as some notes pitch bend and others not, without duplicating the same
+instrument across multiple channels (and then risk editing the instrument in one place and
+forgetting to update it in the copy channels). I had this problem with the white synths in my
+Heavy Light cover towards the end of it. The white synth does chords/pad, but also doubles the
+purple synth's melody in the bass which doesn't have the same note breaks so I couldn't use
+"continue" transition mode.
 
 
 
