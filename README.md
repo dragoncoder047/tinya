@@ -4,7 +4,7 @@
 
 TinyA is a simple, versatile, and opinionated Javascript/Typescript library for playing a wide range of 8-bit videogame style sound effects and music.
 
-TinyA is inspired by [BeepBox][], [ZzFX][], and [ZzFXM][], and but is not related to any of those, is completely incompatible, and is most certainly larger than ZzFXM (you wouldn't want to use TinyA in a js13k game even though it is small. It's not *that* small compared to ZzFXM.)
+TinyA is inspired by [BeepBox][], [ZzFX][], and [ZzFXM][], and but is not related to any of those, isn't entirely compatible, and is most certainly larger than ZzFXM (you wouldn't want to use TinyA in a js13k game even though it is small. It's not *that* small compared to ZzFXM.)
 
 [ZzFX]: https://github.com/KilledByAPixel/ZzFX
 [ZzFXM]: https://github.com/keithclark/ZzFXM
@@ -22,7 +22,7 @@ When the sound is to be played, the remaining inputs to the graph are filled wit
 
 The graph is defined as a nested list structure. Each node is written as the node type specifier, followed by its inputs.
 
-The node can optionally start with a string beginning with `=`. This names the node, which enables it to be referenced by other nodes. This is removed if present, and then the rest of the array is processed as if it was a normal unnamed node.
+The node can optionally start with a string beginning with `=`. This names the node, which enables it to be referenced by other nodes. This is removed and recorded if present, and then the rest of the array is processed as if it was a normal unnamed node.
 
 The node type specifier can be one of two things:
 
@@ -76,7 +76,7 @@ The input channel list is most likely used for stuff like pitch bend, articulati
 
 Each input channel list is a list of time slices, and each slice is composed of two numbers: the length of the time slice, and the ending value at the end of the slice. If the length of the time slice is not zero, the values are linearly interpolated between them.
 
-The starting value is assumed to be 0, and if the ending value is omitted, it is also assumed to be 0. The first time value
+The starting value is assumed to be 0, and if the ending value is omitted, it is also assumed to be 0. The first time value can simply have a zero duration if you don't want 0, to instantly set the value to that.
 
 For example:
 
@@ -111,6 +111,9 @@ Given a channel array as specified above, takes all of the time values from each
 
 **`tinya.toBufferNode(samples, audioCtx, sampleRate=44100)` -> AudioBufferSourceNode<br>**
 Puts the samples into a Web Audio buffer node and returns the audio node. The node isn't connected to anything and isn't started automatically. To play it directly call `node.connect(audioCtx.destination); node.start();`. For stereo output the samples parameter can also be a 2-element array with 2 arrays of samples but there's nothing here that uses that yet.
+
+**`tinya.zzfxSamples(...)` -> array of samples<br>**
+Works the same way as normal ZzFX. If I implemented everything correctly it should also be sample-identical too. It does *not* play the samples, you need to pass them into `tinya.toBufferNode` and then play it.
 
 (TODO: write the predefined node types, macros, etc. here)
 
@@ -204,25 +207,7 @@ As TinyA is intended to create not only sound effects, but music, there are spec
         * It could just be a macro that outputs things
         * Either that or the outputs of the channel have to be named
 
-* Implement a few more nodes to allow me to implement the rest of the functionality of ZzFX so that TinyA can act as a backend of ZzFX compatibility.
-
-    Current capabilities:
-    * Basic oscillator (using the built-in oscillator node) with 5 wave shapes, shape curve, and noise
-    * Filter (dedicated node)
-    * Bitcrusher (dedicated node)
-    * ADSR (using input channel or fake node and manual duration)
-    * Echo/flanger delay (dedicated node)
-    * Tremolo (using another sinewave oscillator and some offsets)
-    * Modulation (using another sinewave oscillator and a π/2-radian phase offset since it's supposed to be cosine not sine)
-    * Pitch jump (using the frequency input channel) but only if repeatTime is 0 (and if slide and deltaSlide are not zero will need to split the frequency into sum of 2 channels to make math easier)
-
-    Need to implement:
-    * A "clock" node that outputs all 0's except for a single-sample 1 when an internal counter rolls over (counter is controlled by wall time or by an input)
-    * An integrator that sums up its input, with an initial value. (optionally with upper and lower wrap and clamp limits and a reset).
-        * This could be initialized to the base frequency, and "clock" could then multiply by the pitchJump amount and be sent through a delay line (pitchJumpTime length) into the integrator
-    * Do the pitch slide and deltaSlides using integrators
-
-    * Maybe also make a ZzFXM importer and renderer.
+* Maybe also make a ZzFXM importer and renderer.
 
 * Some more kinds of math nodes.
     * A selector node that takes N+1 inputs and uses the first % N to select which input (this could be used with a clock and integrator combination to do the arpeggiation thing from BeepBox)
@@ -232,5 +217,6 @@ As TinyA is intended to create not only sound effects, but music, there are spec
     * Have a node that can tell the length
     * This would simplify the BeepBox arpeggiation if the pitch channel output can output an array
 
-* :smiley: :smiley: :smiley: Make a BeepBox fork that uses TinyA as a backend and lets people edit the instrument graph visually, and then export to some compressed-JSON string that can be sent to a dedicated renderer
+* :smiley: :smiley: :smiley: Make [a BeepBox fork](https://github.com/dragoncoder047/dragonbox) that uses TinyA as a backend and lets people edit the instrument graph visually, and then export to some compressed-JSON string that can be sent to a dedicated renderer
     * Could implement this using [Flume](https://github.com/chrisjpatty/flume)
+    * DragonBox is not there yet.

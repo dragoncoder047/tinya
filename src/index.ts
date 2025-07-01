@@ -6,3 +6,4 @@ export * from "./channel";
 export * from "./nodeImpl";
 export * from "./json";
 export * from "./play";
+export * from "./zzfx.ts";

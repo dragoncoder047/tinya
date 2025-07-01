@@ -1,3 +1,4 @@
+import { standardChannel } from "./channel";
 import {
     abs,
     cos,
@@ -10,7 +11,8 @@ import {
     TAU,
     tri
 } from "./math";
-import { NodeImpl, NodeImplFactory } from "./types";
+import type { NodeImpl, NodeImplFactory } from "./types";
+import { isUndefined } from "./utils";
 
 
 /** constant node - discards all its inputs and returns the value passed to the constructor */
@@ -62,22 +64,34 @@ export const bitcrusher = () => {
 }
 
 
-/** Fixed delay. For echo and flanger effects. If feedbackGain is non-zero, the filter's output will be fed back into itself. Don't use a value greater than 1 for feedbackGain or you will get a horrible feedback shriek. */
-export const delay = (sampleRate: number, delayTime: number) => {
-    if (delayTime === 0) return (_: any, sample: number) => sample; // special case no delay
-    const delaySamples = (sampleRate * delayTime) | 0;
-    const buffer: number[] = new Array(delaySamples).fill(0);
-    var i = 0;
-    return (_: any, sample: number, feedbackGain = 0) => {
-        // TODO: variable delay time (if less than buffer length, advance read in next line by bufLen-delayTime samples, if too long resize buffer)
-        const output = buffer[i]!;
-        buffer[i] = sample + output * feedbackGain;
-        i = (i + 1) % delaySamples;
-        return output;
+/** Variable delay. For echo and flanger effects. If feedbackGain is non-zero, the filter's output
+ * will be fed back into itself. Don't use a value greater than 1 for feedbackGain or you will
+ * get a horrible feedback shriek. */
+export const delay = (sampleRate: number) => {
+    var len = 1<<16;
+    var buffer: number[] = new Array(len).fill(0);
+    var pos = 0;
+    return (_: any, delayTime: number, feedbackGain = 0, sample: number) => {
+        const delaySamples = sampleRate * delayTime;
+        // len is always a power of 2
+        if (delaySamples > len) {
+            var newLen = len << 1;
+            const newBuffer = new Array(newLen).fill(0);
+            // poor man's memcpy
+            for (var i = 0; i < len; i++) newBuffer[i] = buffer[(pos + i) % len];
+            buffer = newBuffer;
+            pos = len;
+            len = newLen;
+        }
+        const out = buffer[((pos + len - delaySamples) | 0) % len]!;
+        buffer[pos] = sample + out * feedbackGain;
+        pos = (pos + 1) % len;
+        return out;
     }
 }
 
-/** Shimmer effect. Adds a random amount to the value, but only if the value has changed. The shimmer amount is relative to the value (0.05 = 5%). */
+/** Shimmer effect. Adds a random amount to the value, but only if the value has changed.
+ * The shimmer amount is relative to the value (0.05 = 5%). */
 export const shimmerer = (_: any) => {
     var oldValue = 0, out = 0;
     return (_: any, value: number, shimmerAmount = .05) => {
@@ -89,15 +103,47 @@ export const shimmerer = (_: any) => {
     }
 }
 
+export const clock = (sampleRate: number) => {
+    var time = Infinity; // make it roll over on the first sample
+    const dt = 1 / sampleRate;
+    return (_: any, interval: number, speed = 1) => {
+        time += dt * speed;
+        if (time >= interval) {
+            time = 0;
+            return 1;
+        }
+        return 0;
+    }
+}
+
+export const integrator = (sampleRate: number, initialValue = 0, sampleAccurate = 1) => {
+    var integral = initialValue;
+    return (_: number, integrand: number, reset = 0, resetTo?: number, wrapL?: number, wrapH?: number, clampL?: number, clampH?: number) => {
+        integral += integrand / (sampleAccurate ? sampleRate : 1);
+        if (!isUndefined(wrapL) && !isUndefined(wrapH)) {
+            const difference = wrapH - wrapL;
+            if (integral < wrapL) integral += difference;
+            if (integral > wrapH) integral -= difference;
+        }
+        if (!isUndefined(clampH) && integral > clampH) integral = clampH;
+        if (!isUndefined(clampL) && integral < clampL) integral = clampL;
+        if (reset > 0) integral = resetTo ?? 0;
+        return integral;
+    }
+}
+
 
 // MAIN EXPORTS OBJECT
 export const builtinNodes: Record<string, NodeImplFactory> = {
-    gain: gainMixer,
-    ringmod: gainMixer, // ring modulator is just a multiplicative gain mixer lol
-    add: summingMixer,
-    wave: zzfxOscillator,
-    filter: biquadFilter,
-    bitcrush: bitcrusher,
-    delay: delay,
-    shimmer: shimmerer,
+    g: gainMixer,
+    rm: gainMixer, // ring modulator is just a multiplicative gain mixer lol
+    a: summingMixer,
+    w: zzfxOscillator,
+    f: biquadFilter,
+    b: bitcrusher,
+    d: delay,
+    sh: shimmerer,
+    c: clock,
+    i: integrator,
+    ch: standardChannel as any,
 };
