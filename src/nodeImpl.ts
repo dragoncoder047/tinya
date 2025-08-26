@@ -64,21 +64,22 @@ export const bitcrusher = () => {
 }
 
 
-/** Variable delay. For echo and flanger effects. If feedbackGain is non-zero, the filter's output
+/** Variable delay. For echo and flanger effects. If feedbackGain is non-zero, the delay line's output
  * will be fed back into itself. Don't use a value greater than 1 for feedbackGain or you will
  * get a horrible feedback shriek. */
 export const delay = (sampleRate: number) => {
     var len = 1<<16;
-    var buffer: number[] = new Array(len).fill(0);
+    var buffer = new Float32Array(len);
     var pos = 0;
     return (_: any, delayTime: number, feedbackGain = 0, sample: number) => {
         const delaySamples = sampleRate * delayTime;
         // len is always a power of 2
         if (delaySamples > len) {
             var newLen = len << 1;
-            const newBuffer = new Array(newLen).fill(0);
-            // poor man's memcpy
-            for (var i = 0; i < len; i++) newBuffer[i] = buffer[(pos + i) % len];
+            const newBuffer = new Float32Array(len);
+            // poor man's memcpy to make it wrap right
+            // (.set() is just a singular memcpy with no wrapping)
+            for (var i = 0; i < len; i++) newBuffer[i] = buffer[(pos + i) % len]!;
             buffer = newBuffer;
             pos = len;
             len = newLen;
@@ -122,8 +123,8 @@ export const integrator = (sampleRate: number, initialValue = 0, sampleAccurate 
         integral += integrand / (sampleAccurate ? sampleRate : 1);
         if (!isUndefined(wrapL) && !isUndefined(wrapH)) {
             const difference = wrapH - wrapL;
-            if (integral < wrapL) integral += difference;
-            if (integral > wrapH) integral -= difference;
+            while (integral < wrapL) integral += difference;
+            while (integral > wrapH) integral -= difference;
         }
         if (!isUndefined(clampH) && integral > clampH) integral = clampH;
         if (!isUndefined(clampL) && integral < clampL) integral = clampL;

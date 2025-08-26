@@ -46,8 +46,8 @@ const splitTimings = (channel: Channel, sampleRate: number): [number[], number[]
         const dt = ((channel[i] ?? 0) * sampleRate);
         dts.push(dt);
         ts.push(t);
-        vals.push(channel[i + 1] ?? 0);
-        t += dt;
+        vals.push(channel[i + 1] ?? vals.at(-1)!);
+        t += Math.abs(dt);
     }
     return [dts, ts, vals];
 }

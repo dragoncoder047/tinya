@@ -74,18 +74,17 @@ For example:
 
 The input channel list is most likely used for stuff like pitch bend, articulation, tempo, EQ, and envelope, but it's not locked to anything like that.
 
-Each input channel list is a list of time slices, and each slice is composed of two numbers: the length of the time slice, and the ending value at the end of the slice. If the length of the time slice is not zero, the values are linearly interpolated between them.
+Each input channel list is a list of time slices, and each slice is composed of two numbers: the length of the time slice, and the ending value at the end of the slice. If the length of the time slice is not zero, the values are linearly interpolated between them. If the time value is negative, it means to make a step change to the output value at the beginning of the interval and then hold it for -N seconds; if the output value is undefined it is assumed to be the same as the previous time slice.
 
-The starting value is assumed to be 0, and if the ending value is omitted, it is also assumed to be 0. The first time value can simply have a zero duration if you don't want 0, to instantly set the value to that.
+The starting value is assumed to be 0. The first time value can simply have a zero or negative duration if you don't want 0, to instantly set the value to that.
 
 For example:
 
 ```js
 [
-    0, 10, // start at 10
-    .5, 10, // stay at 10 for 1/2 second
+    -.5, 10, // start at 10, stay at 10 for 1/2 second
     4, 20, // ramp up from 10 to 20 over 4 seconds
-    3 // ramp from 20 to 0 over 3 seconds (end of sequence)
+    3, 0 // ramp from 20 to 0 over 3 seconds
 ]
 ```
 
@@ -138,17 +137,17 @@ As TinyA is intended to create not only sound effects, but music, there are spec
     ```js
     [
         , // undefined to put it in tempo mode
-        24, 0, 120, // start at 120 BPM, hold for 24 beats
-        4, , 130, // linearly poco accelerando over 4 beats
-        3.75, 0, 60, // suddent molto ritardando, 60 BPM for 3.75 beats
-        .25, 0, 3, // basically a fermata (hold last 16th node at 3 BPM)
-        32, 0, 120 // a tempo for the rest of the song
+        -24, 120, // steady at 120 BPM for 24 beats
+        4, 130, // linearly poco accelerando over 4 beats
+        -3.75, 60, // suddent molto ritardando, 60 BPM, for 3.75 beats
+        -.25, 3, // basically a fermata (hold last 16th node at 3 BPM)
+        -32, 120 // a tempo for the rest of the song
     ]
     ```
 
-2. If the first element is a negative number (which would normally make no sense -- how could something last for negative time), it instead means that the channel is relative to the output of channel -N. So for example, you could list the "conductor" channel first (at index 0) which controls the tempo and BPM, and song data channels could be relative to this (using beat count rather than wall time for timing); they would all start with -0.
+2. If the first element is a negative number (which would normally make no sense -- how could something last for negative time), it instead means that the channel is relative to the output of channel -(N-1). So for example, you could list the "conductor" channel first (at index 0) which controls the tempo and BPM, and song data channels could be relative to this (using beat count rather than wall time for timing); they would all start with -1 meaning channel 0.
 
-3. If the first three elements begin with undefined and a negative number, this means that it is a "articulation" or resetting per-note channel. The negative number means the same thing as in case 2 (which channel to use as a gate input), and the third value is the behavior parameter which is a number or undefined:
+<!-- 3. If the first three elements begin with undefined and a negative number, this means that it is a "envelope" or resetting per-note channel. The negative number means the same thing as in case 2 (which channel to use as a gate input), and the third value is the behavior parameter which is a number or undefined:
     * undefined or 0: modulation is disabled; timer resets when input goes to zero
     * 1: modulation is disabled; timer resets when input changes
     * 2: modulation value **adds** to the output value; timer resets when input goes to zero
@@ -174,6 +173,9 @@ As TinyA is intended to create not only sound effects, but music, there are spec
         .2 // release time = 200 ms
     ]
     ```
+TODO: the envelope channel header conflicts with the negative duration BPM thing
+
+-->
 
 ## Other ideas that haven't been well thought out
 
