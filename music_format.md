@@ -90,12 +90,16 @@ type Metadata = {
 };
 type Bar = Note[];
 type Note = [
-    instrument: number,
+    instrument: number | ModIndex
     nextOffset: number, // in beats
     start: NotePin,
-    pinLength: number, // in beats
-    end: NotePin,
-    // repeat last two if there are more than 3 pins
+    ...([
+        pinLength: number, // in beats
+        end: NotePin,
+        // repeat last two if there are more than 3 pins
+    ] | [
+        [shape: [bar: number | undefined, noteIndex: number]]
+    ]);
 ];
 type NotePin = MIDINote + (1 - Expression);
     // if MIDINote is 0, it means there is no pitch bend in this pin
