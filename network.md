@@ -2,7 +2,9 @@ node call = string of letters + `(` + parameters joined by `,` + `)`
 
 (special case: no letters = 'identity' node which just returns its sole input unchanged; useful for math expressions)
 
-macro call = same as node call but using `[]` (name can't be empty)
+macro call = same as node call but using `{}` (name can't be empty)
+
+list = wrapped in `[]`
 
 reffed node = `#` + string of letters or numbers + `=` + node call or expression
 

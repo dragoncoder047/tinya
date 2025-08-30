@@ -88,9 +88,13 @@ type Metadata = {
         octRatio?: number; // defaults to 2 obviously
     };
 };
-type Bar = Note[];
+type InstrumentName = number | string; // string if metadata uses instrument names
+type Bar = [
+    barLength: number, // in beats
+    ...Note[]
+];
 type Note = [
-    instrument: number | ModIndex
+    instrument: InstrumentName | ModIndex
     nextOffset: number, // in beats
     start: NotePin,
     ...([
@@ -98,7 +102,7 @@ type Note = [
         end: NotePin,
         // repeat last two if there are more than 3 pins
     ] | [
-        [shape: [bar: number | undefined, noteIndex: number]]
+        [shapeBar: number | undefined, shapeNoteIndex: number]
     ]);
 ];
 type NotePin = MIDINote + (1 - Expression);
@@ -108,10 +112,9 @@ type ModIndex = [
     target: ModTarget,
     which: number | string,
 ];
-type ModTarget = number | undefined;
-    // number >=0 = instrument index
-    // -1 or undefined = global song effects
-    // -2 = conductor (tempo, next bar, etc)
+type ModTarget = InstrumentName | undefined;
+    // instrument name or number >=0 = instrument index
+    // undefined = global song effects incl tempo
     // if it's a mod, the notePin is just taken as a verbatim number which is multiplied with the set value
 type Instrument = [
     // for determining timing of events and blends when multiple notes start or stop at the same tick
