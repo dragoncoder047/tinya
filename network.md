@@ -18,7 +18,7 @@ first input of a node can be piped into using `|>` it comes before parameters
 
 any amount of whitespace is allowed anywhere
 
-comments are C style (`//` for line comments, `/*`...`*/` for block comments which CAN nest)
+comments are C style (`//` for line comments, `/*`...`*/` for block comments which DO nest)
 
 ---
 
