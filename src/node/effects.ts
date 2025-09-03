@@ -73,8 +73,7 @@ export const delay: Node = [
         var len = 1 << 16;
         var buffer = new Float32Array(len);
         var pos = 0;
-        var fadeTime = Number.MAX_VALUE;
-        return (args, active) => {
+        return args => {
             const sample = args[0]!, delayTime = args[1]!;
             const delaySamples = sampleRate * delayTime;
             // len is always a power of 2
@@ -87,10 +86,6 @@ export const delay: Node = [
                 buffer = newBuffer;
                 pos = len;
                 len = newLen;
-            }
-            fadeTime -= 1 / sampleRate;
-            if (fadeTime > 0) {
-                if (active()) fadeTime = delayTime;
             }
             const out = buffer[((pos + len - delaySamples) | 0) % len]!;
             buffer[pos] = sample;
