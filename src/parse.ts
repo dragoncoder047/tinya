@@ -102,32 +102,55 @@ export enum ASTType {
     LIST,
     MACRO,
     EXPRESSION,
+    DEFAULT
 }
 
-export type AST = [ASTType, ...(AST | number | string)[]];
+
+export enum ASTIndex {
+    TYPE = 0,
+    LINE = 1,
+    COL = 2,
+    EXPR_LEFT = 3,
+    EXPR_OP = 4,
+    EXPR_RIGHT = 5,
+    CONST_VAL = 3,
+    NAME = 3,
+    LIST_VALUES_BEGIN = 3,
+    PARAMS_BEGIN = 4,
+}
+export type AST =
+    | [ASTType.CONSTANT, number, number, number]
+    | [ASTType.ENUM_CONSTANT, number, number, string]
+    | [ASTType.NAME_DEF, number, number, string, AST]
+    | [ASTType.NAME_REF, number, number, string]
+    | [ASTType.NODE, number, number, string, ...AST[]]
+    | [ASTType.LIST, number, number, ...AST[]]
+    | [ASTType.MACRO, number, number, string, ...AST[]]
+    | [ASTType.EXPRESSION, number, number, AST, string, AST]
+    | [ASTType.DEFAULT, number, number];
 
 // #region Parser
 
-function shunting_yard(tokens: (AST | string)[]): AST {
-    const opStack: string[] = [];
+function shunting_yard(tokens: (AST | Token)[]): AST {
+    const opStack: Token[] = [];
     const valueStack: AST[] = [];
     const popOperator = () => {
         var right = valueStack.pop()!;
         var left = valueStack.pop()!;
         var op = opStack.pop()!;
-        valueStack.push([ASTType.EXPRESSION, left, op, right]);
+        valueStack.push([ASTType.EXPRESSION, op.line, op.col, left, op.text, right]);
     };
     for (var token of tokens) {
         if (Array.isArray(token)) {
             valueStack.push(token);
-        } else if (token === "(") {
+        } else if (token.text === "(") {
             opStack.push(token);
-        } else if (token === ")") {
-            while (opStack.length > 0 && opStack.at(-1) !== "(") popOperator();
+        } else if (token.text === ")") {
+            while (opStack.length > 0 && opStack.at(-1)!.text !== "(") popOperator();
             opStack.pop();
         } else {
             var temp: string;
-            while (opStack.length > 0 && (temp = opStack.at(-1)!) !== "(" && precedenceOf(token) >= precedenceOf(temp)) popOperator();
+            while (opStack.length > 0 && (temp = opStack.at(-1)!.text) !== "(" && precedenceOf(token.text) >= precedenceOf(temp)) popOperator();
             opStack.push(token);
         }
     }
@@ -149,7 +172,7 @@ function precedenceOf(p: string) {
 }
 
 function lift_commas(expr: AST): AST[] {
-    return expr[0] === ASTType.EXPRESSION && expr[2] === "," ? [...lift_commas(expr[1] as AST), ...lift_commas(expr[3] as AST)] : [expr];
+    return expr[ASTIndex.TYPE] === ASTType.EXPRESSION && expr[ASTIndex.EXPR_OP] === "," ? [...lift_commas(expr[ASTIndex.EXPR_LEFT] as AST), ...lift_commas(expr[ASTIndex.EXPR_RIGHT] as AST)] : [expr];
 };
 
 function parse_from_tokens(tokens: Token[]): AST {
@@ -177,44 +200,49 @@ function parse_from_tokens(tokens: Token[]): AST {
         if (token === undefined) return undefined;
         switch (token.type) {
             case TokenType.NUMBER:
-                return [ASTType.CONSTANT, parseFloat(token.text), token.line, token.col];
+                return [ASTType.CONSTANT, token.line, token.col, parseFloat(token.text)];
             case TokenType.NAME_REF:
-                return [ASTType.NAME_REF, token.text.slice(1, -1), token.line, token.col];
+                return [ASTType.NAME_REF, token.line, token.col, token.text.slice(1, -1), ];
             case TokenType.NAME_DEF:
-                return [ASTType.NAME_DEF, token.text.slice(1, -1), parse_thing(true)!, token.line, token.col];
+                return [ASTType.NAME_DEF, token.line, token.col, token.text.slice(1, -1), parse_thing(true)!];
             case TokenType.NAME:
                 const after = nextToken(false);
                 if (after && after.text === "(") {
-                    return [ASTType.NODE, token.text, ...lift_commas(parse_expression(")", true))];
+                    return [ASTType.NODE, token.line, token.col, token.text, ...lift_commas(parse_expression(")", true))];
                 }
                 if (after && after.text === "{") {
-                    return [ASTType.MACRO, token.text, ...lift_commas(parse_expression("}", true))];
+                    return [ASTType.MACRO, token.line, token.col, token.text, ...lift_commas(parse_expression("}", true))];
                 }
                 pos--; // make it a peek
-                return [ASTType.ENUM_CONSTANT, token.text];
+                return [ASTType.ENUM_CONSTANT, token.line, token.col, token.text];
+            // @ts-expect-error
+            // fallthrough is intentional
             case TokenType.PAREN:
                 switch (token.text) {
                     case "[":
-                        return [ASTType.LIST, ...lift_commas(parse_expression("]", true))];
+                        return [ASTType.LIST, token.line, token.col, ...lift_commas(parse_expression("]", true))];
                     case "(":
                         return parse_expression(")", false);
                 }
-
+            case TokenType.OP:
+                if (!require_next && (token.text === "," || token.text === ")")) {
+                    pos--;
+                    return;
+                }
         }
         throw new ParseError("", { unexpected: token.text }, token.line, token.col);
     };
     const parse_expression = (end: string, isArgs: boolean): AST => {
-        const stuff: (AST | string)[] = [];
+        const stuff: (AST | Token)[] = [];
         for (; ;) {
             const thing = parse_thing(false);
-            if (thing === undefined) break;
-            stuff.push(thing);
             const tok = nextToken(true);
+            stuff.push(thing ?? [ASTType.DEFAULT, tok.line, tok.col]);
             if (tok.text === end) break;
             if (tok.type !== TokenType.OP) {
                 throw new ParseError("missing" + (isArgs ? " comma?" : " operator?"), { unexpected: tok.text }, tok.line, tok.col);
             }
-            stuff.push(tok.text);
+            stuff.push(tok);
         }
         return shunting_yard(stuff);
     };
@@ -228,13 +256,7 @@ export function parse(s: string): AST {
 }
 
 // TEST
-const src = `
-foo(a + a, [c+d, e] |> var(123), bar(x ** 2, y / (z - 1)),
-// Single line comment
-#myVar=macro{[1,2,3], #ref#}, baz(qux(4, 5), arr([6,7]) + 8),
-/*
-Multi-line comment /* nested */ comments */ (alpha - beta) * gamma / delta |> omega)
-`;
+const src = `foo()`;
 
 try {
     const res = parse(src);
