@@ -1,9 +1,10 @@
-import { Node, NodeHelp } from ".";
+import { NodeDef, NodeHelp, NodeValueType } from ".";
 import { abs, noise3, noise5, saw, sgn, sin, tan, TAU, tri } from "../math";
 
-export const zzfxOscillator: Node = [
+export const zzfxOscillator: NodeDef = [
     "zzfxOscillator",
-    [["frequency", 0], ["shape", 0], ["distortion", 1], ["noise", 0], ["phaseMod", 0]],
+    [["frequency", null], ["shape", 0], ["distortion", 1], ["noise", 0], ["phaseMod", 0]],
+    NodeValueType.SCALAR,
     [, { sine: 0, triangle: 1, sawtooth: 2, tangent: 3, noise3: 4 }],
     sampleRate => {
         var phase = 0, sampleNo = 0;

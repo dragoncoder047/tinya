@@ -1,14 +1,13 @@
 import { makeADSRChannel } from "./channel";
 import { compileInstrument } from "./instrument";
-import { minstringify } from "./json";
-import { builtinNodes } from "./nodeImpl";
 import { buildSamples } from "./play";
-import { NodeParameter } from "./types";
 import { isArray, isUndefined } from "./utils";
 
 export const ZZFX_SAMPLE_RATE = 44100;
 
 const ZZFX_MASTER_GAIN = .3;
+
+type NodeParameter = any;
 
 export const zzfxSamples = (
     volume = 1,
@@ -32,7 +31,7 @@ export const zzfxSamples = (
     decay = 0,
     tremolo = 0,
     filter = 0
-): number[] => {
+) => {
     volume *= ZZFX_MASTER_GAIN;
     slide *= 500;
     deltaSlide *= 500;
@@ -98,5 +97,5 @@ export const zzfxSamples = (
     const bitcrushedNode = bitCrush ? ["b", bitCrush, filteredNode] : filteredNode;
     if (delay > 0) bitcrushedNode.unshift("=di");
     const masterGainNode = ["g", volume, bitcrushedNode];
-    return buildSamples(compileInstrument(masterGainNode as any, builtinNodes), {}, totalDuration, ZZFX_SAMPLE_RATE);
+    // return buildSamples(compileInstrument(masterGainNode as any, builtinNodes), {}, totalDuration, ZZFX_SAMPLE_RATE);
 }

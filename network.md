@@ -1,22 +1,30 @@
 node call = string of letters + `(` + parameters joined by `,` + `)`
 
-(special case: no letters = 'identity' node which just returns its sole input unchanged; useful for math expressions)
-
-macro call = same as node call but using `{}` (name can't be empty)
+parameters in node call can be named `name: value` to give params by name, follows python rules (no anonymous arguments after named arguments)
 
 list = wrapped in `[]`
 
-reffed node = `#` + string of letters or numbers + `=` + node call or expression
+name def = name + `=` + definition
 
-node backref = `#` + string of letters or numbers + `#`
+name ref = name on its own
+
+enum constant = `.` + name
 
 param = node call or macro call or number or expression
 
-expression = math expression with `+-*/,` of parameters; can operate samplewise or controlwise as needed. comma operator `,` works like in JS, left is evaluated but discarded (it can be a node named or something)
+expression = math expression of parameters. comma operator `,` works like in JS, left is evaluated but discarded (it can be a node named or something)
 
-first input of a node can be piped into using `|>` it comes before parameters
+pipe operator `|>` needs node on right, and passes value to first parameter (syntax transformation)
+
+map pipe operator `*>` takes list and expression, and copies the expression for each element and passes it in like with `|>`
+
+reduce pipe `+>` takes a list and returns the sum of the elements
 
 any amount of whitespace is allowed anywhere
+
+macro definition = node def + `:-` + body
+
+template = `{`...`}` for quasiquote, `&`x for unquote
 
 comments are C style (`//` for line comments, `/*`...`*/` for block comments which DO nest)
 

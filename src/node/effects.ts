@@ -1,10 +1,11 @@
-import { Node, NodeHelp } from ".";
+import { NodeDef, NodeHelp, NodeValueType } from ".";
 import { TAU, abs, cos, sin, sgn } from "../math";
 
 
-export const zzfxFilter: Node = [
+export const zzfxFilter: NodeDef = [
     "zzfxFilter",
-    [["sample", 0], ["cutoff", 0], ["quality", 2]],
+    [["sample", null], ["cutoff", null], ["quality", 2]],
+    NodeValueType.SCALAR,
     [],
     sampleRate => {
         var x2 = 0, x1 = 0, y2 = 0, y1 = 0;
@@ -37,9 +38,10 @@ export const zzfxFilterHelp: NodeHelp = {
     }
 };
 
-export const bitcrusher: Node = [
+export const bitcrusher: NodeDef = [
     "bitcrusher",
-    [["sample", 0], ["sampleRate", 8000]],
+    [["sample", null], ["sampleRate", 8000]],
+    NodeValueType.SCALAR,
     [],
     realSampleRate => {
         var phase = 0, last = 0;
@@ -65,9 +67,10 @@ export const bitcrusherHelp: NodeHelp = {
     }
 }
 
-export const delay: Node = [
+export const delay: NodeDef = [
     "delay",
-    [["sample", 0], ["time", 0]],
+    [["sample", null], ["time", 0]],
+    NodeValueType.SCALAR,
     [],
     sampleRate => {
         var len = 1 << 16;
