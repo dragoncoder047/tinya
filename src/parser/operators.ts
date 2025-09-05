@@ -26,7 +26,7 @@ export const OPS: Record<string, [binary: number | undefined, unary?: number, ri
     ",": [11], // separator
 };
 
-export const OP_REGEX = new RegExp(`^(${Object.keys(OPS).map(e => e.replaceAll(/([()[\]{}*+?|^])/g, "\\$1")).join("|")})`);
+export const OP_REGEX = new RegExp(`^(${Object.keys(OPS).sort((a, b) => b.length - a.length).map(e => e.replaceAll(/([()[\]{}*+?|^])/g, "\\$1")).join("|")})`);
 console.log(OP_REGEX);
 
 export function getPrecedenceSloppy(token: string, unary: 1 | 0): number | undefined {
