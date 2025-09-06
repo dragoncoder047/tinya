@@ -46,7 +46,7 @@ export const bitcrusher: NodeDef = [
     realSampleRate => {
         var phase = 0, last = 0;
         return args => {
-            const sample = args[0]!, bitcrushSampleRate = args[1]!, bits = args[2]!;
+            const sample = args[0]!, bitcrushSampleRate = args[1]!;
             phase += bitcrushSampleRate / realSampleRate;
             if (phase >= 1) {
                 phase -= (phase | 0);

@@ -1,18 +1,12 @@
+import { str } from "../utils";
 import { AST } from "./ast";
 import { parseTokens } from "./core";
 import { ParseError } from "./errors";
 import { tokenize } from "./tokenizer";
-import { chainTransformers, commasToBlocks, expandTernaryOperators, liftKeywordArguments, validateDefaults } from "./visitors";
-
-// #endregion
+import { transformAST } from "./transformers";
 
 export function parse(src: string, filename: string): AST {
-    return chainTransformers(parseTokens(tokenize(src, filename)), [
-        expandTernaryOperators,
-        commasToBlocks,
-        validateDefaults,
-        liftKeywordArguments,
-    ]);
+    return transformAST(parseTokens(tokenize(src, filename)));
 }
 
 /*
@@ -22,19 +16,19 @@ next steps to handle AST:
 1. expand node names
 2. expand and interpolate enum names
 3. constant folding for constant+constant expressions
-4. expand macros, if done then back to 1
+4. expand macros, if expansion was done then back to 1
 5. do type checks
 
 */
 
 // TEST
-const src = `foo(a:,b:,c)`;
+const src = `[a+a, a, a]`;
 
 try {
-    const res = parse(src, "stdin");
-    console.log(JSON.stringify(res, null, 2));
+    const res = parse(src, "<string>");
+    console.log(str(res, null, 2));
 } catch (e) {
     if (e instanceof ParseError)
-        console.error(e.displayOn({ stdin: src }));
+        console.error(e.displayOn({ "<string>": src }));
     else throw e;
 }

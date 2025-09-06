@@ -1,36 +1,13 @@
-import { AST, ASTAssignment, ASTBinaryOp, ASTDefaultPlaceholder, ASTNameReference, ASTUnaryOp } from "./ast";
-import { LocationTrace, ParseError } from "./errors";
-import { getPrecedence, getPrecedenceSloppy, isRightAssociative } from "./operators";
+import { str } from "../utils";
+import { AST, ASTBinaryOp, ASTDefaultPlaceholder, ASTUnaryOp } from "./ast";
+import { ErrorNote, LocationTrace, ParseError } from "./errors";
+import { getPrecedence, getPrecedenceSloppy, isRightAssociative } from "./operator";
 import { Token, TokenType } from "./tokenizer";
 
-export function treeifyExpression(tokens: (AST | Token)[], lastToken: Token | undefined): AST {
-    // special case for nothing in the expression
-    if (tokens.length === 0) return new ASTDefaultPlaceholder(lastToken?.location ?? LocationTrace.unknown);
-    var i: number, firstToken: Token | undefined = undefined;
-    for (i = 0; i < tokens.length - 1; i++) {
-        const here = tokens[i]!;
-        const next = tokens[i + 1]!;
-        if (here instanceof Token) {
-            if (firstToken === undefined) firstToken = here;
-            if (next instanceof Token) {
-                if (here.type === TokenType.OPERATOR && next.type === TokenType.ASSIGN) {
-                    tokens.splice(i, 2, { ...here, assign: next.location });
-                }
-            }
-            // special case for consecutive commas: insert default things in between
-            if (here.type === TokenType.OPERATOR && here.text === ",") {
-                if (next.type === TokenType.OPERATOR && next.text === ",") {
-                    if (i === tokens.length - 2) {
-                        tokens.push(new ASTDefaultPlaceholder(lastToken?.location ?? LocationTrace.unknown));
-                    }
-                    tokens.splice(i + 1, 0, new ASTDefaultPlaceholder(next.location));
-                }
-                if (i === 0) {
-                    tokens.splice(0, 0, new ASTDefaultPlaceholder(here.location));
-                }
-            }
-        }
-    }
+export function treeifyExpression(tokens: (AST | Token)[], lift: boolean = false): AST {
+    var i: number;
+    commaAndAssignHack(tokens);
+    const firstToken = tokens.find(t => t instanceof Token);
     // The algorithm is 'recursive lifting':
     // first try to find the highest precedence unary operator with no higher binary after its atom, and lift it into an atom
     // if no such unary exists find the highest precedence binary and lift it ito an atom
@@ -46,41 +23,28 @@ export function treeifyExpression(tokens: (AST | Token)[], lastToken: Token | un
             if (token instanceof AST) prevWasAtom = true;
             else {
                 if (i > lastAtomIndex) {
-                    const tokenString = JSON.stringify(token.text);
-                    throw new ParseError(`expected a value after operator, but got ${tokenString}`, (i - 1 > lastAtomIndex) && getPrecedenceSloppy(token.text, 1) === undefined ? token.location.withSourceNote(`note: ${tokenString} is not a valid unary operator either`) : token.location);
+                    const tokenString = str(token.text);
+                    throw new ParseError(`expected a value after operator, but got ${tokenString}`, token.location, (i - 1 > lastAtomIndex) && getPrecedenceSloppy(token.text, true) === undefined ? [new ErrorNote(`note: ${tokenString} is not a valid unary operator either`, token.location)] : []);
                 }
                 if (prevWasAtom) {
-                    const precedence = getPrecedence(token, 0);
+                    const precedence = getPrecedence(token, false);
                     if (bestBinaryPrecedence > precedence || (bestBinaryPrecedence === precedence && isRightAssociative(token.text))) {
                         bestBinaryPrecedence = precedence;
                         bestBinaryIndex = i;
                     }
                 } else {
-
-                    switch (token.type) {
-                        case TokenType.ASSIGN:
-                            throw new ParseError("assignment not valid here", token.location);
-                        case TokenType.OPERATOR:
-                            // possible unary operator to lift
-                            if (token.assign) {
-                                throw new ParseError("cannot compound-assign as unary operator", token.assign);
-                            }
-                            const mePrecedence = getPrecedence(token, 1);
-                            if (!(tokens[i + 1]! instanceof AST)) break; // not innermost unary
-                            const opAfter = tokens[i + 2];
-                            if (opAfter) {
-                                if (opAfter instanceof AST) {
-                                    // TODO: trigger this error when 2 atoms come before any operator (right now it triggers the 'unknown error')
-                                    throw new ParseError("expected operator before value", opAfter.edgemost(true).location);
-                                }
-                                const opAfterPrecedence = getPrecedence(opAfter, 0);
-                                if (opAfterPrecedence < mePrecedence) break; // don't lift yet
-                            }
-                            // we can lift this
-                            if (bestUnaryPrecedence > mePrecedence) {
-                                bestUnaryPrecedence = mePrecedence;
-                                bestUnaryIndex = i;
-                            }
+                    // possible unary operator to lift
+                    if (!(tokens[i + 1]! instanceof AST)) break; // not innermost unary
+                    const mePrecedence = getPrecedence(token, true);
+                    const opAfter = tokens[i + 2] as Token | undefined;
+                    if (opAfter) {
+                        const opAfterPrecedence = getPrecedence(opAfter, false);
+                        if (opAfterPrecedence < mePrecedence) break; // don't lift yet
+                    }
+                    // we can lift this
+                    if (bestUnaryPrecedence > mePrecedence) {
+                        bestUnaryPrecedence = mePrecedence;
+                        bestUnaryIndex = i;
                     }
                 }
                 prevWasAtom = false;
@@ -91,23 +55,36 @@ export function treeifyExpression(tokens: (AST | Token)[], lastToken: Token | un
             tokens.splice(bestUnaryIndex, 0, new ASTUnaryOp(op.location, op.text, val));
         } else if (bestBinaryIndex >= 0) {
             const [left, op, right] = tokens.splice(bestBinaryIndex - 1, 3) as [AST, Token, AST];
-            if (op.type === TokenType.ASSIGN) {
-                if (!(left instanceof ASTNameReference)) {
-                    throw new ParseError("invalid assignment target", left.edgemost(false).location.withSourceNote("note: assignment was here:", op.location));
-                }
-                tokens.splice(bestBinaryIndex - 1, 0);
-            } else {
-                const math = new ASTBinaryOp(op.location, op.text, left, right);
-                if (op.assign) {
-                    if (!(left instanceof ASTNameReference)) {
-                        throw new ParseError("invalid target of compound assignment", left.edgemost(false).location.withSourceNote("note: assignment was here:", op.assign));
-                    }
-                    tokens.splice(bestBinaryIndex - 1, 0, new ASTAssignment(op.assign, left.name, math));
-                } else tokens.splice(bestBinaryIndex - 1, 0, math);
-            }
+            const math = new ASTBinaryOp(op.location, op.text, left, right, false, op.assign);
+            tokens.splice(bestBinaryIndex - 1, 0, math);
         } else {
             throw new ParseError("unknown error in expression parsing", firstToken?.location);
         }
     }
-    return tokens[0] as AST;
+    const result = tokens[0];
+    if (lift && result instanceof ASTBinaryOp) result.noLift = true;
+    return result as AST;
+}
+
+function commaAndAssignHack(tokens: (AST | Token)[]) {
+    for (var i = -1; i < tokens.length; i++) {
+        const here = tokens[i];
+        const next = tokens[i + 1];
+        if (commaIsh(here) && commaIsh(next)) {
+            // insert default sentinels in between consecutive commas or colons
+            tokens.splice(i + 1, 0, new ASTDefaultPlaceholder(next?.location ?? here?.location ?? LocationTrace.nowhere));
+        } else if (tokenLike(here) && tokenLike(next) && here.type === TokenType.OPERATOR && next.type === TokenType.OPERATOR && next.text === "=") {
+            tokens.splice(i, 2, new Token(here.text, here.location, here.type, next.location));
+        } else if (here instanceof AST && next instanceof AST) {
+            throw new ParseError("expected operator before value", next.edgemost(false).location);
+        }
+    }
+}
+
+function commaIsh(x: Token | AST | undefined): x is Token | undefined {
+    return !x || (x instanceof Token && (x.text === "," || x.text === ":"));
+}
+
+function tokenLike(x: Token | AST | undefined) {
+    return x instanceof Token;
 }

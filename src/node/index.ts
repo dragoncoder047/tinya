@@ -15,7 +15,7 @@ export type NodeDef = [
     params: [name: string, default_: number | null, type?: NodeValueType][],
     returnType: NodeValueType,
     enumChoices: (Record<string, number> | undefined)[],
-    impl: (sampleRate: number) => (args: Float32Array, listArgs: number[]) => number,
+    impl: (sampleRate: number) => (args: number[], listArgs: number[]) => number,
 ];
 
 export type NodeHelp = {
