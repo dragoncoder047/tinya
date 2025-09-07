@@ -7,11 +7,15 @@ export class LocationTrace {
     static nowhere = new LocationTrace(0, 0, "unknown");
 }
 function formatTrace(trace: LocationTrace, message: string, sources: Record<string, string>): string {
-    const src = sources[trace.filename] ?? "";
-    const lines = src.split("\n");
-    const relevantLine = lines[trace.line] || "";
-    const lineNumberString = trace.line + 1 + "";
-    return `${trace.filename}:${trace.line + 1}:${trace.col + 1}: ${message}\n${lineNumberString} | ${relevantLine}\n${" ".repeat(lineNumberString.length)} | ${" ".repeat(trace.col)}^`;
+    const src = sources[trace.filename];
+    var lineInfo = "";
+    if (src) {
+        const lines = src.split("\n");
+        const relevantLine = lines[trace.line] || "";
+        const lineNumberString = trace.line + 1 + "";
+        lineInfo = `\n${lineNumberString} | ${relevantLine}\n${" ".repeat(lineNumberString.length)} | ${" ".repeat(trace.col)}^`;
+    }
+    return `${trace.filename}:${trace.line + 1}:${trace.col + 1}: ${message}${lineInfo}`;
 }
 
 export class ErrorNote {

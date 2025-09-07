@@ -167,10 +167,14 @@ const TRANSFORM_PASSES = [
     function validateListDefaultSentinels(ast: AST): AST {
         if (!(ast instanceof ASTList)) return ast.map(validateListDefaultSentinels);
         const args = ast.values.map(validateListDefaultSentinels);
+        // Special case for empty list
+        if (args.length === 1 && args[0] instanceof ASTDefaultPlaceholder) {
+            return new ASTList(ast.location, []);
+        }
         for (var i = 0; i < args.length; i++) {
             const el = args[i]!;
             if (el instanceof ASTDefaultPlaceholder) {
-                throw new ParseError((i + 1) === args.length ? "illgal trailing comma in list" : "empty elements not allowed in list", el.location, [new ErrorNote("note: list starts here", ast.location)]);
+                throw new ParseError((i + 1) === args.length ? "illegal trailing comma in list" : "empty elements not allowed in list", el.location, [new ErrorNote("note: list starts here", ast.location)]);
             }
         }
         return ast;

@@ -4,21 +4,27 @@
     "description": "",
     "main": "src/index.ts",
     "scripts": {
-        "build": "node build.mjs",
-        "dev:build": "node build.mjs -w",
+        "build": "pnpm bun run scripts/build",
+        "dev:build": "pnpm run build -w",
         "dev:serve": "python3 -m http.server",
         "dev": "pnpm run \"/^dev:.*/\"",
-        "lint": "tsc"
+        "lint": "tsc",
+        "test": "pnpm bun test --todo",
+        "test:watch": "pnpm test --watch"
     },
     "keywords": [],
     "author": "dragoncoder047",
     "license": "GPL-3.0-only",
     "devDependencies": {
+        "@types/bun": "^1.2.21",
+        "@types/node": "^24.3.1",
+        "bun": "^1.2.21",
         "esbuild": "^0.25.0",
         "typescript": "^5.6.2"
     },
     "pnpm": {
         "onlyBuiltDependencies": [
+            "bun",
             "esbuild"
         ]
     }

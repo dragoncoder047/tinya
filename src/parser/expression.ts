@@ -1,7 +1,6 @@
-import { str } from "../utils";
 import { AST, ASTBinaryOp, ASTDefaultPlaceholder, ASTUnaryOp } from "./ast";
-import { ErrorNote, LocationTrace, ParseError } from "./errors";
-import { getPrecedence, getPrecedenceSloppy, isRightAssociative } from "./operator";
+import { LocationTrace, ParseError } from "./errors";
+import { getPrecedence, isRightAssociative } from "./operator";
 import { Token, TokenType } from "./tokenizer";
 
 export function treeifyExpression(tokens: (AST | Token)[], lift: boolean = false): AST {
@@ -23,8 +22,7 @@ export function treeifyExpression(tokens: (AST | Token)[], lift: boolean = false
             if (token instanceof AST) prevWasAtom = true;
             else {
                 if (i > lastAtomIndex) {
-                    const tokenString = str(token.text);
-                    throw new ParseError(`expected a value after operator, but got ${tokenString}`, token.location, (i - 1 > lastAtomIndex) && getPrecedenceSloppy(token.text, true) === undefined ? [new ErrorNote(`note: ${tokenString} is not a valid unary operator either`, token.location)] : []);
+                    throw new ParseError("expected a value after operator", token.location);
                 }
                 if (prevWasAtom) {
                     const precedence = getPrecedence(token, false);

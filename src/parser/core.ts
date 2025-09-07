@@ -15,7 +15,7 @@ function unescape(string: string): string {
         a: "\a", b: "\b", e: "\e", f: "\f", n: "\n", r: "\r", t: "\t", v: "\v", z: "\0", "'": "'", "\"": "\"", "\\": "\\",
         x: false as const,
         u: false as const
-    }[string.toLowerCase()[0]!] ?? string) || String.fromCodePoint(parseInt(/[0-9a-f]+/.exec(string)![0], 16));
+    }[string.toLowerCase()[0]!] ?? string) || String.fromCodePoint(parseInt(/[0-9a-f]+/i.exec(string)![0], 16));
 }
 
 export function parseTokens(tokens: Token[]): AST {

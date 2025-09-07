@@ -1,7 +1,5 @@
-import { str } from "../utils";
 import { AST } from "./ast";
 import { parseTokens } from "./core";
-import { ParseError } from "./errors";
 import { tokenize } from "./tokenizer";
 import { transformAST } from "./transformers";
 
@@ -20,15 +18,3 @@ next steps to handle AST:
 5. do type checks
 
 */
-
-// TEST
-const src = `[a+a, a, a]`;
-
-try {
-    const res = parse(src, "<string>");
-    console.log(str(res, null, 2));
-} catch (e) {
-    if (e instanceof ParseError)
-        console.error(e.displayOn({ "<string>": src }));
-    else throw e;
-}
