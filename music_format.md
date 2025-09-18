@@ -68,12 +68,12 @@ type Filler = 0 | undefined;
 
 ```ts
 type Song = [
+    metadata: Metadata,
     instruments: Instrument[],
     bars: Bar[],
     barGrid: number[][],
     initialTempo: number,
     postprocess: AudioNodeDefinition, // for stuff like limiter and eq
-    metadata: Metadata,
 ];
 type Metadata = {
     title: string;
@@ -83,7 +83,7 @@ type Metadata = {
     license?: string;
     instrumentNames?: string[];
     tuning?: {
-        rootN?: number; // defaults to 69, (A4)
+        rootN?: [noteNo: number, Hz: number]; // defaults to [69, 440] (standard A4)
         edo?: number; // defaults to 12 obviously. If it is not 12 then it is the number of notes per octave
         octRatio?: number; // defaults to 2 obviously
     };
@@ -96,16 +96,16 @@ type Bar = [
 type Note = [
     instrument: InstrumentName | ModIndex
     nextOffset: number, // in beats
-    start: NotePin,
+    pitchBase: number,
     ...([
-        pinLength: number, // in beats
+        pinOffset: number, // in beats
         end: NotePin,
         // repeat last two if there are more than 3 pins
     ] | [
         [shapeBar: number | undefined, shapeNoteIndex: number]
     ]);
 ];
-type NotePin = MIDINote + (1 - Expression);
+type NotePin = [pitch: number, expression: number];
     // if MIDINote is 0, it means there is no pitch bend in this pin
     // Expression is always present
 type ModIndex = [
@@ -116,15 +116,7 @@ type ModTarget = InstrumentName | undefined;
     // instrument name or number >=0 = instrument index
     // undefined = global song effects incl tempo
     // if it's a mod, the notePin is just taken as a verbatim number which is multiplied with the set value
-type Instrument = [
-    // for determining timing of events and blends when multiple notes start or stop at the same tick
-    // TODO: figure out how to implement this
-    modNetwork: AudioNodeDefinition,
-    // instantiated per-voice and sustained until the note is no longer active
-    voiceNetwork: AudioNodeDefinition,
-    // instantiated once for the instrument, input sample is the sum of all voices
-    perInstrumentEffects: AudioNodeDefinition,
-];
+type Instrument = AudioNodeDefinition;
 
 // see network.md
 type AudioNodeDefinition = string;

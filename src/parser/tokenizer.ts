@@ -51,7 +51,7 @@ const TOKENIZE_RULES: Rule[] = [
     [[State.RAW_STRING], /^\\./, TokenType.STRING_BODY],
     [[State.RAW_STRING], /^[^\\']+/, TokenType.STRING_BODY],
     // number
-    [[State.INITIAL], /^(\.\d+|\d+\.?\d*)(e[+-]?\d+)?/i, TokenType.NUMBER],
+    [[State.INITIAL], /^-?(\.\d+|\d+\.?\d*)(e[+-]?\d+)?/i, TokenType.NUMBER],
     // operators
     [[State.INITIAL], OP_REGEX, TokenType.OPERATOR],
     // parens

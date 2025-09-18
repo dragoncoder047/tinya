@@ -32,12 +32,12 @@ export function treeifyExpression(tokens: (AST | Token)[], lift: boolean = false
                     }
                 } else {
                     // possible unary operator to lift
-                    if (!(tokens[i + 1]! instanceof AST)) break; // not innermost unary
+                    if (!(tokens[i + 1]! instanceof AST)) continue; // not innermost unary
                     const mePrecedence = getPrecedence(token, true);
                     const opAfter = tokens[i + 2] as Token | undefined;
                     if (opAfter) {
                         const opAfterPrecedence = getPrecedence(opAfter, false);
-                        if (opAfterPrecedence < mePrecedence) break; // don't lift yet
+                        if (opAfterPrecedence < mePrecedence) continue; // don't lift yet
                     }
                     // we can lift this
                     if (bestUnaryPrecedence > mePrecedence) {

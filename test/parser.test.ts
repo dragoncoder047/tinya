@@ -29,14 +29,10 @@ describe("parse primitive values", () => {
             value: 123.456e+78
         });
     });
-    test("not parse negative number", () => {
+    test("negative number", () => {
         expectAST("-1", {
-            __class__: ASTUnaryOp,
-            op: "-",
-            value: {
-                __class__: ASTConstant,
-                value: 1
-            }
+            __class__: ASTConstant,
+            value: -1
         });
     });
     test("regular string", () => {
@@ -143,21 +139,35 @@ describe("parse expressions", () => {
             }
         });
     });
-    test.todo("unary minus comes after exponentiation [BROKEN]", () => {
-        expectAST("-1 ^ x", {
+    test("unary minus comes after exponentiation", () => {
+        expectAST("-a ^ x", {
             __class__: ASTUnaryOp,
             op: "-",
             value: {
                 __class__: ASTBinaryOp,
                 op: "^",
                 left: {
-                    __class__: ASTConstant,
-                    value: 1,
+                    __class__: ASTNameReference,
+                    name: "a",
                 },
                 right: {
                     __class__: ASTNameReference,
                     name: "x"
                 }
+            }
+        });
+    });
+    test("unary minus doesn't come after exponentiation with a number", () => {
+        expectAST("-1 ^ x", {
+            __class__: ASTBinaryOp,
+            op: "^",
+            left: {
+                __class__: ASTConstant,
+                value: -1,
+            },
+            right: {
+                __class__: ASTNameReference,
+                name: "x"
             }
         });
     });
@@ -168,9 +178,9 @@ describe("parse expressions", () => {
         expectParseError("(abc234(1, 4)", '"(" was never closed');
         expectParseError("[{a: 1, b: 3", '"{" was never closed');
         expectParseError("[1 => 2, 3 => [", '"[" was never closed');
-        expectParseError("]:", 'stray close paren');
-        expectParseError("}:-", 'stray close paren');
-        expectParseError(":)", 'stray close paren');
+        expectParseError("]:", "stray close paren");
+        expectParseError("}:-", "stray close paren");
+        expectParseError(":)", "stray close paren");
     });
     test("mismatched parens", () => {
         expectParseError("[a, b)", 'expected "]"');

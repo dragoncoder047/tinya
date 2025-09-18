@@ -2,7 +2,6 @@ import { expect } from "bun:test";
 import { parse } from "../src/parser";
 import { AST } from "../src/parser/ast";
 import { ErrorNote, ParseError } from "../src/parser/errors";
-import { fail } from "assert";
 
 const F = "<test string>";
 
@@ -34,7 +33,7 @@ export function expectAST(p: string, spec: ASTSpec) {
         checkAST(parse(p, F), spec, "");
     } catch (e) {
         if (e instanceof ParseError) {
-            fail(e.displayOn({ [F]: p }));
+            expect.unreachable(e.displayOn({ [F]: p }));
         }
         else throw e;
     }
@@ -42,7 +41,7 @@ export function expectAST(p: string, spec: ASTSpec) {
 export function expectParseError(p: string, error: string, note?: string) {
     try {
         parse(p, F);
-        fail("Did not throw an error!");
+        expect.unreachable("Did not throw an error!");
     } catch (e: any) {
         expect(e).toBeInstanceOf(ParseError);
         expect(e.message).toEqual(error);
