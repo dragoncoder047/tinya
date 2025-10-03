@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
-import { LocationTrace } from "../src/parser/errors";
-import { tokenize, TokenType } from "../src/parser/tokenizer";
+import { LocationTrace } from "../src/compiler/errors";
+import { tokenize, TokenType } from "../src/compiler/tokenizer";
 
 const F = "<TEST>";
 

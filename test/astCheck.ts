@@ -1,7 +1,7 @@
 import { expect } from "bun:test";
-import { parse } from "../src/parser";
-import { AST } from "../src/parser/ast";
-import { ErrorNote, ParseError } from "../src/parser/errors";
+import { parse } from "../src/compiler";
+import { AST } from "../src/compiler/ast";
+import { ErrorNote, ParseError } from "../src/compiler/errors";
 
 const F = "<test string>";
 

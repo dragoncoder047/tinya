@@ -1,6 +1,3 @@
-import type { NodeParameter, NodeTree } from "./types";
-import { gensym, isNumber } from "./utils";
-
 // TODO nested macros are broken
 
 export const unisons = (oscTemplate: NodeTree, voices = 1, spread = 0, offset = 0, sign = 1, amp = 1 / voices, freqIndex = 1): NodeTree => {

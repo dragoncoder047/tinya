@@ -1,5 +1,5 @@
-import { AST } from "./parser/ast";
+import { AST } from "./compiler/ast";
 declare module "*.preparsed.txt" {
-    const value: AST;
+    const value: AST.Node;
     export default value;
 }

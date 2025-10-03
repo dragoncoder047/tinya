@@ -7,6 +7,10 @@ export function parse(src: string, filename: string): AST.Node {
     return transformAST(parseTokens(tokenize(src, filename))).simp();
 }
 
+// export function expandNodeNames(unexpanded: AST.Node): AST.Node {
+    
+// }
+
 /*
 
 next steps to handle AST:

@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { AST } from "../src/parser/ast";
+import { AST } from "../src/compiler/ast";
 import { describe } from "node:test";
 import { expectAST, expectParseError } from "./astCheck";
 

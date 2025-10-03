@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parse } from "../src/parser";
-import { AST } from "../src/parser/ast";
-import { LocationTrace, ParseError } from "../src/parser/errors";
+import { parse } from "../src/compiler";
+import { AST } from "../src/compiler/ast";
+import { LocationTrace, ParseError } from "../src/compiler/errors";
 import { optreq } from "./com";
 
 const internedStrings = new Map<string, string>();
@@ -99,8 +99,8 @@ try {
 
 const js = toJS(ast);
 const pathToSrc = optreq("-p");
-process.stdout.write(`import { AST } from ${JSON.stringify("./" + join(pathToSrc, "parser/ast"))};
-import { LocationTrace } from ${JSON.stringify("./" + join(pathToSrc, "parser/errors"))};
+process.stdout.write(`import { AST } from ${JSON.stringify("./" + join(pathToSrc, "compiler/ast"))};
+import { LocationTrace } from ${JSON.stringify("./" + join(pathToSrc, "compiler/errors"))};
 export const source = /* @__PURE__ */ ${JSON.stringify(input.split("\n"), null, 4)}.join("\\n");
 ${getInternedStrings()}
 const ast = ${js};
