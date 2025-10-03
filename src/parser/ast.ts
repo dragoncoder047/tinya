@@ -1,168 +1,171 @@
 import { OPERATORS } from "../operators";
 import { LocationTrace } from "./errors";
 
-export abstract class AST {
-    constructor(public location: LocationTrace) { }
-    abstract edgemost(left: boolean): AST;
-    abstract pipe(fn: (node: AST) => AST): AST;
-    abstract constantFold(): AST;
-}
+export namespace AST {
 
-class ASTLeaf extends AST {
-    edgemost() { return this; }
-    pipe() { return this; }
-    constantFold(): AST { return this; }
-}
-
-export class ASTAnnotatedValue extends AST {
-    constructor(trace: LocationTrace, public attributes: AST[], public value: AST | null = null) { super(trace); }
-    pipe(fn: (node: AST) => AST): AST { return new ASTAnnotatedValue(this.location, this.attributes.map(fn), this.value ? fn(this.value) : null); }
-    edgemost(left: boolean): AST { return left ? (this.attributes.length > 0 ? this.attributes[0]!.edgemost(left) : this) : (this.value ?? this); }
-    constantFold(): AST { return new ASTAnnotatedValue(this.location, this.attributes.map(a => a.constantFold()), this.value?.constantFold()); }
-}
-
-export class ASTConstant extends ASTLeaf {
-    constructor(trace: LocationTrace, public value: number | string) { super(trace); };
-}
-
-export class ASTSymbol extends ASTLeaf {
-    constructor(trace: LocationTrace, public value: string) { super(trace); };
-}
-
-export class ASTAssignment extends AST {
-    constructor(trace: LocationTrace, public name: string, public value: AST) { super(trace); };
-    edgemost(left: boolean): AST { return left ? this : this.value.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTAssignment(this.location, this.name, fn(this.value)); }
-    constantFold() { return new ASTAssignment(this.location, this.name, this.value.constantFold()); }
-}
-
-export class ASTNameReference extends ASTLeaf {
-    constructor(trace: LocationTrace, public name: string) { super(trace); };
-}
-
-export class ASTCall extends AST {
-    constructor(trace: LocationTrace, public name: string, public args: AST[]) { super(trace); };
-    edgemost(left: boolean): AST { return left ? this : this.args.at(-1)?.edgemost(left) ?? this; }
-    pipe(fn: (node: AST) => AST) { return new ASTCall(this.location, this.name, this.args.map(fn)); }
-    constantFold(): AST { return new ASTCall(this.location, this.name, this.args.map(a => a.constantFold())); }
-}
-
-export class ASTList extends AST {
-    constructor(trace: LocationTrace, public values: AST[]) { super(trace); };
-    edgemost(left: boolean): AST { return this.values.length > 0 ? left ? this.values[0]!.edgemost(left) : this.values.at(-1)!.edgemost(left) : this; }
-    pipe(fn: (node: AST) => AST) { return new ASTList(this.location, this.values.map(fn)); }
-    constantFold(): AST {
-        const values = this.values.flatMap(a => {
-            const v = a.constantFold();
-            if (v instanceof ASTSplatExpression && v.value instanceof ASTList) return v.value.values;
-            return [v];
-        });
-        return new ASTList(this.location, values);
+    export abstract class Node {
+        constructor(public loc: LocationTrace) { }
+        abstract edgemost(left: boolean): Node;
+        abstract pipe(fn: (node: Node) => Node): Node;
+        abstract simp(): Node;
     }
-}
 
-export class ASTDefine extends AST {
+    class Leaf extends Node {
+        edgemost() { return this; }
+        pipe() { return this; }
+        simp(): Node { return this; }
+    }
 
-    constructor(trace: LocationTrace, public name: string, public parameters: AST[], public body: AST) { super(trace); };
-    edgemost(left: boolean): AST { return left ? this.parameters.length > 0 ? this.parameters[0]!.edgemost(left) : this : this.body.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTDefine(this.location, this.name, this.parameters.map(fn), fn(this.body)); }
-    constantFold(): AST { return new ASTDefine(this.location, this.name, this.parameters.map(a => a.constantFold()), this.body.constantFold()); }
+    export class AnnotatedValue extends Node {
+        constructor(trace: LocationTrace, public attributes: Node[], public value: Node | null = null) { super(trace); }
+        pipe(fn: (node: Node) => Node): Node { return new AnnotatedValue(this.loc, this.attributes.map(fn), this.value ? fn(this.value) : null); }
+        edgemost(left: boolean): Node { return left ? (this.attributes.length > 0 ? this.attributes[0]!.edgemost(left) : this) : (this.value ?? this); }
+        simp(): Node { return new AnnotatedValue(this.loc, this.attributes.map(a => a.simp()), this.value?.simp()); }
+    }
 
-}
+    export class Constant extends Leaf {
+        constructor(trace: LocationTrace, public value: number | string) { super(trace); };
+    }
 
-export class ASTParameterDescriptor extends AST {
-    constructor(trace: LocationTrace, public name: string, public enumOptions: AST, public defaultValue: AST) { super(trace) }
-    edgemost(left: boolean): AST { return left ? this : this.defaultValue.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTParameterDescriptor(this.location, this.name, fn(this.enumOptions), fn(this.defaultValue)) }
-    constantFold(): AST { return new ASTParameterDescriptor(this.location, this.name, this.enumOptions.constantFold(), this.defaultValue.constantFold()); }
-}
+    export class Symbol extends Leaf {
+        constructor(trace: LocationTrace, public value: string) { super(trace); };
+    }
 
-export class ASTTemplate extends AST {
-    constructor(trace: LocationTrace, public result: AST) { super(trace); };
-    edgemost(left: boolean): AST { return this.result.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTTemplate(this.location, fn(this.result)); }
-    constantFold(): AST { return new ASTTemplate(this.location, this.result.constantFold()); }
-}
+    export class Assignment extends Node {
+        constructor(trace: LocationTrace, public name: string, public value: Node) { super(trace); };
+        edgemost(left: boolean): Node { return left ? this : this.value.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new Assignment(this.loc, this.name, fn(this.value)); }
+        simp() { return new Assignment(this.loc, this.name, this.value.simp()); }
+    }
 
-export class ASTBinaryOp extends AST {
-    constructor(trace: LocationTrace, public op: string, public left: AST, public right: AST, public noLift: boolean = false, public assign?: LocationTrace | undefined) { super(trace); };
-    edgemost(left: boolean): AST { return this[left ? "left" : "right"].edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTBinaryOp(this.location, this.op, fn(this.left), fn(this.right), this.noLift, this.assign); }
-    constantFold(): AST {
-        const left = this.left.constantFold();
-        const right = this.right.constantFold();
-        var fn: ((a: any, b: any) => any) | null | undefined;
-        if (left instanceof ASTConstant && right instanceof ASTConstant && (fn = OPERATORS[this.op]?.cb)) {
-            return new ASTConstant(this.location, fn(left.value, right.value));
+    export class Name extends Leaf {
+        constructor(trace: LocationTrace, public name: string) { super(trace); };
+    }
+
+    export class Call extends Node {
+        constructor(trace: LocationTrace, public name: string, public args: Node[]) { super(trace); };
+        edgemost(left: boolean): Node { return left ? this : this.args.at(-1)?.edgemost(left) ?? this; }
+        pipe(fn: (node: Node) => Node) { return new Call(this.loc, this.name, this.args.map(fn)); }
+        simp(): Node { return new Call(this.loc, this.name, this.args.map(a => a.simp())); }
+    }
+
+    export class List extends Node {
+        constructor(trace: LocationTrace, public values: Node[]) { super(trace); };
+        edgemost(left: boolean): Node { return this.values.length > 0 ? left ? this.values[0]!.edgemost(left) : this.values.at(-1)!.edgemost(left) : this; }
+        pipe(fn: (node: Node) => Node) { return new List(this.loc, this.values.map(fn)); }
+        simp(): Node {
+            const values = this.values.flatMap(a => {
+                const v = a.simp();
+                if (v instanceof SplatValue && v.value instanceof List) return v.value.values;
+                return [v];
+            });
+            return new List(this.loc, values);
         }
-        return new ASTBinaryOp(this.location, this.op, left, right);
     }
-}
 
-export class ASTUnaryOp extends AST {
-    constructor(trace: LocationTrace, public op: string, public value: AST) { super(trace); };
-    edgemost(left: boolean): AST { return left ? this : this.value.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTUnaryOp(this.location, this.op, fn(this.value)); }
-    constantFold(): AST {
-        const val = this.value.constantFold();
-        var fn: ((a: any) => any) | null | undefined;
-        if (val instanceof ASTConstant && (fn = OPERATORS[this.op]?.cu)) {
-            return new ASTConstant(this.location, fn(val.value));
+    export class Definition extends Node {
+        constructor(trace: LocationTrace, public name: string, public parameters: Node[], public body: Node) { super(trace); };
+        edgemost(left: boolean): Node { return left ? this.parameters.length > 0 ? this.parameters[0]!.edgemost(left) : this : this.body.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new Definition(this.loc, this.name, this.parameters.map(fn), fn(this.body)); }
+        simp(): Node { return new Definition(this.loc, this.name, this.parameters.map(a => a.simp()), this.body.simp()); }
+
+    }
+
+    export class ParameterDescriptor extends Node {
+        constructor(trace: LocationTrace, public name: string, public enumOptions: Node, public defaultValue: Node) { super(trace) }
+        edgemost(left: boolean): Node { return left ? this : this.defaultValue.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new ParameterDescriptor(this.loc, this.name, fn(this.enumOptions), fn(this.defaultValue)) }
+        simp(): Node { return new ParameterDescriptor(this.loc, this.name, this.enumOptions.simp(), this.defaultValue.simp()); }
+    }
+
+    export class Template extends Node {
+        constructor(trace: LocationTrace, public result: Node) { super(trace); };
+        edgemost(left: boolean): Node { return this.result.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new Template(this.loc, fn(this.result)); }
+        simp(): Node { return new Template(this.loc, this.result.simp()); }
+    }
+
+    export class BinaryOp extends Node {
+        constructor(trace: LocationTrace, public op: string, public left: Node, public right: Node, public noLift: boolean = false, public assign?: LocationTrace | undefined) { super(trace); };
+        edgemost(left: boolean): Node { return this[left ? "left" : "right"].edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new BinaryOp(this.loc, this.op, fn(this.left), fn(this.right), this.noLift, this.assign); }
+        simp(): Node {
+            const left = this.left.simp();
+            const right = this.right.simp();
+            var fn: ((a: any, b: any) => any) | null | undefined;
+            if (left instanceof Constant && right instanceof Constant && (fn = OPERATORS[this.op]?.cb)) {
+                return new Constant(this.loc, fn(left.value, right.value));
+            }
+            return new BinaryOp(this.loc, this.op, left, right);
         }
-        return new ASTUnaryOp(this.location, this.op, val);
     }
-}
 
-export class ASTDefaultPlaceholder extends ASTLeaf {
-}
-
-export class ASTKeywordArg extends AST {
-    constructor(trace: LocationTrace, public name: string, public arg: AST) { super(trace); }
-    edgemost(left: boolean): AST { return left ? this : this.arg.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTKeywordArg(this.location, this.name, fn(this.arg)); }
-    constantFold(): AST { return new ASTKeywordArg(this.location, this.name, this.arg.constantFold()); }
-}
-
-export class ASTMapping extends AST {
-    constructor(trace: LocationTrace, public mapping: { key: AST, val: AST }[]) { super(trace); }
-    edgemost(left: boolean): AST { return this.mapping.length > 0 ? left ? this.mapping[0]!.key.edgemost(left) : this.mapping.at(-1)!.val.edgemost(left) : this; }
-    pipe(fn: (node: AST) => AST) { return new ASTMapping(this.location, this.mapping.map(({ key, val }) => ({ key: fn(key), val: fn(val) }))); }
-    constantFold(): AST { return new ASTMapping(this.location, this.mapping.map(({ key, val }) => ({ key: key.constantFold(), val: val.constantFold() }))); }
-}
-
-export class ASTConditional extends AST {
-    constructor(trace: LocationTrace, public cond: AST, public caseTrue: AST, public caseFalse: AST) { super(trace); }
-    edgemost(left: boolean): AST { return (left ? this.cond : this.caseFalse).edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTConditional(this.location, fn(this.cond), fn(this.caseTrue), fn(this.caseFalse)); }
-    constantFold(): AST {
-        const cond = this.cond.constantFold();
-        if (cond instanceof ASTConstant) {
-            return (!cond.value ? this.caseFalse : this.caseTrue).constantFold();
+    export class UnaryOp extends Node {
+        constructor(trace: LocationTrace, public op: string, public value: Node) { super(trace); };
+        edgemost(left: boolean): Node { return left ? this : this.value.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new UnaryOp(this.loc, this.op, fn(this.value)); }
+        simp(): Node {
+            const val = this.value.simp();
+            var fn: ((a: any) => any) | null | undefined;
+            if (val instanceof Constant && (fn = OPERATORS[this.op]?.cu)) {
+                return new Constant(this.loc, fn(val.value));
+            }
+            return new UnaryOp(this.loc, this.op, val);
         }
-        return new ASTConditional(this.location, cond, this.caseTrue.constantFold(), this.caseFalse.constantFold());
     }
-}
 
-export class ASTInterpolation extends AST {
-    constructor(trace: LocationTrace, public value: AST) { super(trace); }
-    edgemost(left: boolean): AST { return this.value.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTInterpolation(this.location, fn(this.value)); }
-    constantFold(): AST { return new ASTInterpolation(this.location, this.value.constantFold()); }
-}
+    export class DefaultPlaceholder extends Leaf {
+    }
 
-export class ASTSplatExpression extends AST {
-    constructor(trace: LocationTrace, public value: AST) { super(trace); }
-    edgemost(left: boolean): AST { return this.value.edgemost(left); }
-    pipe(fn: (node: AST) => AST) { return new ASTSplatExpression(this.location, fn(this.value)); }
-    constantFold(): AST { return new ASTSplatExpression(this.location, this.value.constantFold()); }
-}
+    export class KeywordArgument extends Node {
+        constructor(trace: LocationTrace, public name: string, public arg: Node) { super(trace); }
+        edgemost(left: boolean): Node { return left ? this : this.arg.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new KeywordArgument(this.loc, this.name, fn(this.arg)); }
+        simp(): Node { return new KeywordArgument(this.loc, this.name, this.arg.simp()); }
+    }
 
-export class ASTPipePlaceholder extends ASTLeaf {
-}
+    export class Mapping extends Node {
+        constructor(trace: LocationTrace, public mapping: { key: Node, val: Node }[]) { super(trace); }
+        edgemost(left: boolean): Node { return this.mapping.length > 0 ? left ? this.mapping[0]!.key.edgemost(left) : this.mapping.at(-1)!.val.edgemost(left) : this; }
+        pipe(fn: (node: Node) => Node) { return new Mapping(this.loc, this.mapping.map(({ key, val }) => ({ key: fn(key), val: fn(val) }))); }
+        simp(): Node { return new Mapping(this.loc, this.mapping.map(({ key, val }) => ({ key: key.simp(), val: val.simp() }))); }
+    }
 
-export class ASTBlock extends AST {
-    constructor(trace: LocationTrace, public body: AST[]) { super(trace); }
-    edgemost(left: boolean): AST { return this.body.length > 0 ? left ? this.body[0]!.edgemost(left) : this.body.at(-1)!.edgemost(left) : this; }
-    pipe(fn: (node: AST) => AST) { return new ASTBlock(this.location, this.body.map(fn)); }
-    constantFold(): AST { return new ASTBlock(this.location, this.body.map(a => a.constantFold())); }
+    export class Conditional extends Node {
+        constructor(trace: LocationTrace, public cond: Node, public caseTrue: Node, public caseFalse: Node) { super(trace); }
+        edgemost(left: boolean): Node { return (left ? this.cond : this.caseFalse).edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new Conditional(this.loc, fn(this.cond), fn(this.caseTrue), fn(this.caseFalse)); }
+        simp(): Node {
+            const cond = this.cond.simp();
+            if (cond instanceof Constant) {
+                return (!cond.value ? this.caseFalse : this.caseTrue).simp();
+            }
+            return new Conditional(this.loc, cond, this.caseTrue.simp(), this.caseFalse.simp());
+        }
+    }
+
+    export class InterpolatedValue extends Node {
+        constructor(trace: LocationTrace, public value: Node) { super(trace); }
+        edgemost(left: boolean): Node { return this.value.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new InterpolatedValue(this.loc, fn(this.value)); }
+        simp(): Node { return new InterpolatedValue(this.loc, this.value.simp()); }
+    }
+
+    export class SplatValue extends Node {
+        constructor(trace: LocationTrace, public value: Node) { super(trace); }
+        edgemost(left: boolean): Node { return this.value.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new SplatValue(this.loc, fn(this.value)); }
+        simp(): Node { return new SplatValue(this.loc, this.value.simp()); }
+    }
+
+    export class PipePlaceholder extends Leaf {
+    }
+
+    export class Block extends Node {
+        constructor(trace: LocationTrace, public body: Node[]) { super(trace); }
+        edgemost(left: boolean): Node { return this.body.length > 0 ? left ? this.body[0]!.edgemost(left) : this.body.at(-1)!.edgemost(left) : this; }
+        pipe(fn: (node: Node) => Node) { return new Block(this.loc, this.body.map(fn)); }
+        simp(): Node { return new Block(this.loc, this.body.map(a => a.simp())); }
+    }
+
 }

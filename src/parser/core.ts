@@ -1,12 +1,12 @@
 import { str } from "../utils";
-import { AST, ASTBinaryOp, ASTCall, ASTConstant, ASTList, ASTNameReference, ASTTemplate } from "./ast";
+import { AST } from "./ast";
 import { ErrorNote, ParseError } from "./errors";
 import { treeifyExpression } from "./expression";
 import { Token, TokenType } from "./tokenizer";
 
 
-export function liftCommas(expr: AST, force = false): AST[] {
-    return expr instanceof ASTBinaryOp && /^[,;]$/.test(expr.op) && (force || !expr.noLift) ? [...liftCommas(expr.left), ...liftCommas(expr.right)] : [expr];
+export function liftCommas(expr: AST.Node, force = false): AST.Node[] {
+    return expr instanceof AST.BinaryOp && /^[,;]$/.test(expr.op) && (force || !expr.noLift) ? [...liftCommas(expr.left), ...liftCommas(expr.right)] : [expr];
 }
 
 // string string string
@@ -18,7 +18,7 @@ function unescape(string: string): string {
     }[string.toLowerCase()[0]!] ?? string) || String.fromCodePoint(parseInt(/[0-9a-f]+/i.exec(string)![0], 16));
 }
 
-export function parseTokens(tokens: Token[]): AST {
+export function parseTokens(tokens: Token[]): AST.Node {
     var pos = 0;
     const nextToken = <T extends boolean>(expect: T, beginParen?: Token): T extends true ? Token : Token | undefined => {
         if (expect && pos >= tokens.length) {
@@ -30,7 +30,7 @@ export function parseTokens(tokens: Token[]): AST {
         }
         return tokens[pos++]!;
     };
-    const parseString = (start: Token): ASTConstant => {
+    const parseString = (start: Token): AST.Constant => {
         var out = "";
         str: for (; ;) {
             const token = nextToken(true, start);
@@ -47,31 +47,31 @@ export function parseTokens(tokens: Token[]): AST {
                     throw new ParseError("illegal escape sequence", token.s);
             }
         }
-        return new ASTConstant(start.s, out);
+        return new AST.Constant(start.s, out);
     }
-    const parseThing = (requireNext: boolean, beginParen?: Token): AST | undefined => {
+    const parseThing = (requireNext: boolean, beginParen?: Token): AST.Node | undefined => {
         const token = nextToken(requireNext, beginParen);
         if (token === undefined) return undefined;
         switch (token.k) {
             case TokenType.NUMBER:
-                return new ASTConstant(token.s, parseFloat(token.t));
+                return new AST.Constant(token.s, parseFloat(token.t));
             case TokenType.STRING_BEGIN:
                 return parseString(token);
             case TokenType.NAME:
                 const after = nextToken(false);
                 if (after && after.t === "(") {
-                    return new ASTCall(token.s, token.t, liftCommas(parseExpression(")", after), true));
+                    return new AST.Call(token.s, token.t, liftCommas(parseExpression(")", after), true));
                 }
                 pos--; // make it a peek
-                return new ASTNameReference(token.s, token.t);
+                return new AST.Name(token.s, token.t);
             // @ts-expect-error
             // fallthrough is intentional!
             case TokenType.PAREN:
                 switch (token.t) {
                     case "{":
-                        return new ASTTemplate(token.s, parseExpression("}", token));
+                        return new AST.Template(token.s, parseExpression("}", token));
                     case "[":
-                        return new ASTList(token.s, liftCommas(parseExpression("]", token), true));
+                        return new AST.List(token.s, liftCommas(parseExpression("]", token), true));
                     case "(":
                         return parseExpression(")", token, true);
                     case ")":
@@ -87,8 +87,8 @@ export function parseTokens(tokens: Token[]): AST {
         }
         throw new ParseError(`unexpected ${{ [TokenType.NAME]: "name", [TokenType.OPERATOR]: "operator" }[token.t] ?? str(token.t)}`, token.s);
     };
-    const parseExpression = (end: string | false, beginParen?: Token, lift = false): AST => {
-        const exprItems: (AST | Token)[] = [];
+    const parseExpression = (end: string | false, beginParen?: Token, lift = false): AST.Node => {
+        const exprItems: (AST.Node | Token)[] = [];
         for (; ;) {
             var tok = nextToken(!!end, beginParen);
             if (!end && tok === undefined) break;
