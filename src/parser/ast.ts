@@ -51,7 +51,14 @@ export class ASTList extends AST {
     constructor(trace: LocationTrace, public values: AST[]) { super(trace); };
     edgemost(left: boolean): AST { return this.values.length > 0 ? left ? this.values[0]!.edgemost(left) : this.values.at(-1)!.edgemost(left) : this; }
     pipe(fn: (node: AST) => AST) { return new ASTList(this.location, this.values.map(fn)); }
-    constantFold(): AST { return new ASTList(this.location, this.values.map(a => a.constantFold())); }
+    constantFold(): AST {
+        const values = this.values.flatMap(a => {
+            const v = a.constantFold();
+            if (v instanceof ASTSplatExpression && v.value instanceof ASTList) return v.value.values;
+            return [v];
+        });
+        return new ASTList(this.location, values);
+    }
 }
 
 export class ASTDefine extends AST {

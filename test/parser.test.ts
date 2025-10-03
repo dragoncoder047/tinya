@@ -808,4 +808,19 @@ describe("constant folding", () => {
             ]
         });
     });
+    test("list splat constant folding", () => {
+        expectAST("[a, *[b]]", {
+            __class__: ASTList,
+            values: [
+                {
+                    __class__: ASTNameReference,
+                    name: "a",
+                },
+                {
+                    __class__: ASTNameReference,
+                    name: "b",
+                }
+            ]
+        })
+    })
 });
