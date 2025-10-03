@@ -11,6 +11,7 @@ class Operator {
     code(b: this["cb"], u: this["cu"] = null) {
         this.cb = b;
         this.cu = u;
+        return this;
     }
 }
 
@@ -24,31 +25,31 @@ export const OPERATORS: Record<string, Operator> = {
     // interpolate
     "&": op(INVALID, 0),
     // length or as 0-ary pipeline placeholder (that is handled specially)
-    "#": op(INVALID, 0),
+    "#": op(INVALID, 0).code(null, a => a.length),
     // boolean NOT
-    "!": op(INVALID, 0),
+    "!": op(INVALID, 0).code(null, a => !a),
     // power
-    "^": op(1, INVALID, true),
+    "^": op(1, INVALID, true).code((a, b) => a ** b),
     // multiply or splat operator
-    "*": op(3, -Infinity),
+    "*": op(3, -Infinity).code((a, b) => a * b),
     // divide
-    "/": op(3),
+    "/": op(3).code((a, b) => a / b),
     // matrix multiply
-    "@": op(3),
+    "@": op(3).code((a, b) => { throw "TODO: matrix multiply"; }),
     // add
-    "+": op(4),
+    "+": op(4).code((a, b) => a + b),
     // subtract, negate
-    "-": op(4, 2),
+    "-": op(4, 2).code((a, b) => a - b, a => -a),
     // boolean OR / AND
-    "||": op(5),
-    "&&": op(5),
+    "||": op(5).code((a, b) => a || b),
+    "&&": op(5).code((a, b) => a && b),
     // comparison
-    "==": op(6),
-    ">=": op(6),
-    ">": op(6),
-    "<=": op(6),
-    "<": op(6),
-    "!=": op(6),
+    "==": op(6).code((a, b) => a == b),
+    ">=": op(6).code((a, b) => a >= b),
+    ">": op(6).code((a, b) => a > b),
+    "<=": op(6).code((a, b) => a <= b),
+    "<": op(6).code((a, b) => a < b),
+    "!=": op(6).code((a, b) => a != b),
     // pipe
     "|>": op(7),
     // each pipe

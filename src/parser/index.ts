@@ -4,7 +4,7 @@ import { tokenize } from "./tokenizer";
 import { transformAST } from "./transformers";
 
 export function parse(src: string, filename: string): AST {
-    return transformAST(parseTokens(tokenize(src, filename)));
+    return transformAST(parseTokens(tokenize(src, filename))).constantFold();
 }
 
 /*

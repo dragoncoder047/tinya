@@ -68,7 +68,7 @@ function toJS(ast: AST): string {
     if (ast instanceof ASTPipePlaceholder)
         return code(ast);
     if (ast instanceof ASTBinaryOp)
-        return code(ast, prim(ast.op), toJS(ast.left), toJS(ast.right), prim(ast.noLift), ...(ast.assign ? [location(ast.assign)] : []));
+        return code(ast, prim(ast.op), toJS(ast.left), toJS(ast.right), ...(ast.assign ? [prim(ast.noLift), location(ast.assign)] : []));
     if (ast instanceof ASTUnaryOp)
         return code(ast, prim(ast.op), toJS(ast.value));
     if (ast instanceof ASTConditional)

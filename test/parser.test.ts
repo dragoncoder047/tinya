@@ -88,37 +88,37 @@ describe("parse primitive values", () => {
 });
 describe("parse expressions", () => {
     test("implicit operator precedence", () => {
-        expectAST("1 + 2 * 3", {
+        expectAST("a + b * c", {
             __class__: ASTBinaryOp,
             op: "+",
             left: {
-                __class__: ASTConstant,
-                value: 1,
+                __class__: ASTNameReference,
+                name: "a",
             },
             right: {
                 __class__: ASTBinaryOp,
                 op: "*",
                 left: {
-                    __class__: ASTConstant,
-                    value: 2,
+                    __class__: ASTNameReference,
+                    name: "b"
                 },
                 right: {
-                    __class__: ASTConstant,
-                    value: 3,
+                    __class__: ASTNameReference,
+                    name: "c",
                 }
             }
         });
     });
     test("parens force order", () => {
-        expectAST("(1 + 2) * 3", {
+        expectAST("(a + 2) * 3", {
             __class__: ASTBinaryOp,
             op: "*",
             left: {
                 __class__: ASTBinaryOp,
                 op: "+",
                 left: {
-                    __class__: ASTConstant,
-                    value: 1,
+                    __class__: ASTNameReference,
+                    name: "a",
                 },
                 right: {
                     __class__: ASTConstant,
@@ -132,7 +132,7 @@ describe("parse expressions", () => {
         });
     });
     test("exponentiation is right associative", () => {
-        expectAST("2 ^ 3 ^ 4", {
+        expectAST("2 ^ a ^ 4", {
             __class__: ASTBinaryOp,
             op: "^",
             left: {
@@ -143,8 +143,8 @@ describe("parse expressions", () => {
                 __class__: ASTBinaryOp,
                 op: "^",
                 left: {
-                    __class__: ASTConstant,
-                    value: 3,
+                    __class__: ASTNameReference,
+                    name: "a",
                 },
                 right: {
                     __class__: ASTConstant,
@@ -388,7 +388,7 @@ describe("parse mapping", () => {
         expectParseError("[1 => 2, 3, 4]", 'expected "=>" after key value');
     });
     test("arbitrary expressions as key & value", () => {
-        expectAST("[1 + 2 => 3 + 4]", {
+        expectAST("[1 + a => 3 + a]", {
             __class__: ASTMapping,
             mapping: [
                 {
@@ -400,8 +400,8 @@ describe("parse mapping", () => {
                             value: 1,
                         },
                         right: {
-                            __class__: ASTConstant,
-                            value: 2,
+                            __class__: ASTNameReference,
+                            name: "a",
                         }
                     },
                     val: {
@@ -412,8 +412,8 @@ describe("parse mapping", () => {
                             value: 3,
                         },
                         right: {
-                            __class__: ASTConstant,
-                            value: 4,
+                            __class__: ASTNameReference,
+                            name: "a",
                         }
                     }
                 }
@@ -774,5 +774,38 @@ describe("parses and attaches attributes", () => {
     });
     test("attribute needs constant arguments", () => {
         expectParseError("#!foo(a + b)", "attribute arguments must all be constants");
+    });
+});
+describe("constant folding", () => {
+    test("simple math", () => {
+        expectAST("1 + 2 * 3", {
+            __class__: ASTConstant,
+            value: 7
+        });
+    });
+    test("conditional elimination", () => {
+        expectAST("1 == 1 ? hello : goodbye", {
+            __class__: ASTNameReference,
+            name: "hello"
+        });
+    });
+    test("inner expressions folded", () => {
+        expectAST("[1+1, 2+2, 2^(1/12)]", {
+            __class__: ASTList,
+            values: [
+                {
+                    __class__: ASTConstant,
+                    value: 2
+                },
+                {
+                    __class__: ASTConstant,
+                    value: 4
+                },
+                {
+                    __class__: ASTConstant,
+                    value: Math.pow(2, 1/12),
+                }
+            ]
+        });
     });
 });
