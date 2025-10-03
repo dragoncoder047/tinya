@@ -1,12 +1,12 @@
 import { str } from "../utils";
-import { AST, ASTAssignment, ASTBinaryOp, ASTBlock, ASTCall, ASTConditional, ASTDefaultPlaceholder, ASTDefine, ASTInterpolation, ASTKeywordArg, ASTList, ASTMapping, ASTNameReference, ASTParameterDescriptor, ASTSymbol, ASTUnaryOp } from "./ast";
+import { AST, ASTAnnotatedValue, ASTAssignment, ASTBinaryOp, ASTBlock, ASTCall, ASTConditional, ASTConstant, ASTDefaultPlaceholder, ASTDefine, ASTInterpolation, ASTKeywordArg, ASTList, ASTMapping, ASTNameReference, ASTParameterDescriptor, ASTSplatExpression, ASTSymbol, ASTUnaryOp } from "./ast";
 import { liftCommas } from "./core";
 import { ErrorNote, ParseError } from "./errors";
 
 const TRANSFORM_PASSES = [
 
     function expandSymbols(ast: AST): AST {
-        if (!(ast instanceof ASTUnaryOp) || ast.op !== ".") return ast.map(expandSymbols);
+        if (!(ast instanceof ASTUnaryOp) || ast.op !== ".") return ast.pipe(expandSymbols);
         if (!(ast.value instanceof ASTNameReference)) {
             throw new ParseError('unexpected "."', ast.location);
         }
@@ -14,13 +14,13 @@ const TRANSFORM_PASSES = [
     },
 
     function expandInterpolations(ast: AST): AST {
-        if (!(ast instanceof ASTUnaryOp) || ast.op !== "&") return ast.map(expandInterpolations);
-        return new ASTInterpolation(ast.location, ast.value.map(expandInterpolations));
+        if (!(ast instanceof ASTUnaryOp) || ast.op !== "&") return ast.pipe(expandInterpolations);
+        return new ASTInterpolation(ast.location, ast.value.pipe(expandInterpolations));
     },
 
     function expandMapping(ast: AST): AST {
-        if (!(ast instanceof ASTList)) return ast.map(expandMapping);
-        const exp = ast.map(expandMapping);
+        if (!(ast instanceof ASTList)) return ast.pipe(expandMapping);
+        const exp = ast.pipe(expandMapping);
         const elements = exp.values;
         const firstKVIndex = elements.findIndex(e => (e instanceof ASTBinaryOp && e.op === "=>"));
         if (firstKVIndex < 0) {
@@ -42,19 +42,39 @@ const TRANSFORM_PASSES = [
     },
 
     function commasToBlocks(ast: AST): AST {
-        if (!(ast instanceof ASTBinaryOp) || ast.op !== ",") return ast.map(commasToBlocks);
+        if (!(ast instanceof ASTBinaryOp) || (ast.op !== "," && ast.op !== ";")) return ast.pipe(commasToBlocks);
         return new ASTBlock(ast.edgemost(true).location, liftCommas(ast, true).map(commasToBlocks));
     },
 
-    function processDefaultSentinels(ast: any): AST {
+    function trimDefaultSentinelsInCallExpression(ast: any): AST {
+        ast = ast.pipe(trimDefaultSentinelsInCallExpression);
+        if (ast instanceof ASTCall)
+            while (ast.args.at(-1) instanceof ASTDefaultPlaceholder) ast.args.pop();
         return ast;
     },
 
-    function expandDefinitions(ast: AST): AST {
-        if (!(ast instanceof ASTBinaryOp) || ast.op !== ":-") return ast.map(expandDefinitions);
-        const header = ast.left.map(expandDefinitions);
-        const body = ast.right.map(expandDefinitions);
+    function trimDefaultSentinelsInBlock(ast: any): AST {
+        ast = ast.pipe(trimDefaultSentinelsInBlock);
+        if (ast instanceof ASTBlock) {
+            for (var i = 0; i < (ast.body.length - 1); i++) {
+                if (ast.body[i] instanceof ASTDefaultPlaceholder) {
+                    ast.body.splice(i, 1);
+                    i--;
+                }
+            }
+        }
+        return ast;
+    },
+
+    function expandDefinitions(ast: AST, alreadyExpanded = false): AST {
+        if (!(ast instanceof ASTBinaryOp) || ast.op !== ":-") return ast.pipe(expandDefinitions);
+        const header = alreadyExpanded ? ast.left : ast.left.pipe(expandDefinitions);
+        const body = alreadyExpanded ? ast.right : ast.right.pipe(expandDefinitions);
         if (!(header instanceof ASTCall)) {
+            if (header instanceof ASTAnnotatedValue && header.value !== null) {
+                ast.left = header.value;
+                return new ASTAnnotatedValue(header.location, header.attributes, expandDefinitions(ast, true));
+            }
             throw new ParseError("illegal header", header.edgemost(true).location, [new ErrorNote("note: definition operator is here", ast.location)]);
         }
         const params = header.args;
@@ -114,9 +134,9 @@ const TRANSFORM_PASSES = [
     },
 
     function expandAssignments(ast: AST): AST {
-        if (!(ast instanceof ASTBinaryOp) || (ast.op !== "=" && !ast.assign)) return ast.map(expandAssignments);
-        const target = ast.left.map(expandAssignments);
-        const body = ast.right.map(expandAssignments);
+        if (!(ast instanceof ASTBinaryOp) || (ast.op !== "=" && !ast.assign)) return ast.pipe(expandAssignments);
+        const target = ast.left.pipe(expandAssignments);
+        const body = ast.right.pipe(expandAssignments);
         if (!(target instanceof ASTNameReference)) {
             throw new ParseError("illegal assignment target", target.edgemost(true).location);
         }
@@ -127,33 +147,32 @@ const TRANSFORM_PASSES = [
     },
 
     function expandTernaryOperators(ast: AST): AST {
-        if (!(ast instanceof ASTBinaryOp) || ast.op !== "?") return ast.map(expandTernaryOperators);
-        const condition = ast.left.map(expandTernaryOperators);
-        const choices = ast.right.map(expandTernaryOperators);
+        if (!(ast instanceof ASTBinaryOp) || ast.op !== "?") return ast.pipe(expandTernaryOperators);
+        const condition = ast.left.pipe(expandTernaryOperators);
+        const choices = ast.right.pipe(expandTernaryOperators);
         if (!(choices instanceof ASTBinaryOp) || choices.op !== ":") {
             throw new ParseError('expected ":" after expression', (choices instanceof ASTBinaryOp ? choices : choices.edgemost(false)).location, [new ErrorNote('note: "?" is here:', ast.location)]);
         }
         return new ASTConditional(ast.location, condition, choices.left, choices.right);
     },
 
-    function createKeywordArguments(ast: AST, insideCall = false): AST {
-        if (ast instanceof ASTCall) return ast.map(e => createKeywordArguments(e, true));
-        if (!(ast instanceof ASTBinaryOp) || ast.op !== ":") return ast.map(e => createKeywordArguments(e, false));
-        const name = ast.left.map(e => createKeywordArguments(e, false));
-        const value = ast.right.map(e => createKeywordArguments(e, false));
+    function createKeywordArguments(ast: AST, parent: AST | null = null): AST {
+        if (!(ast instanceof ASTBinaryOp) || ast.op !== ":") return ast.pipe(e => createKeywordArguments(e, ast));
+        const name = ast.left.pipe(e => createKeywordArguments(e));
+        const value = ast.right.pipe(e => createKeywordArguments(e));
         if (!(name instanceof ASTNameReference)) {
-            throw (insideCall
+            throw (parent instanceof ASTCall
                 ? new ParseError('expected name before ":"', name.edgemost(false).location)
                 : new ParseError('unexpected ":"', ast.location));
         }
-        if (!insideCall) {
+        if (!(parent instanceof ASTCall)) {
             throw new ParseError("named parameter not directly inside a callsite", name.location);
         }
         return new ASTKeywordArg(name.location, name.name, value);
     },
 
     function validateKeywordArguments(ast: AST): AST {
-        if (!(ast instanceof ASTCall)) return ast.map(validateKeywordArguments);
+        if (!(ast instanceof ASTCall)) return ast.pipe(validateKeywordArguments);
         const args = ast.args.map(validateKeywordArguments);
         const firstKWArgIndex = args.findIndex(arg => arg instanceof ASTKeywordArg);
         if (firstKWArgIndex < 0) return ast;
@@ -165,7 +184,7 @@ const TRANSFORM_PASSES = [
     },
 
     function validateListDefaultSentinels(ast: AST): AST {
-        if (!(ast instanceof ASTList)) return ast.map(validateListDefaultSentinels);
+        if (!(ast instanceof ASTList)) return ast.pipe(validateListDefaultSentinels);
         const args = ast.values.map(validateListDefaultSentinels);
         // Special case for empty list
         if (args.length === 1 && args[0] instanceof ASTDefaultPlaceholder) {
@@ -175,6 +194,29 @@ const TRANSFORM_PASSES = [
             const el = args[i]!;
             if (el instanceof ASTDefaultPlaceholder) {
                 throw new ParseError((i + 1) === args.length ? "illegal trailing comma in list" : "empty elements not allowed in list", el.location, [new ErrorNote("note: list starts here", ast.location)]);
+            }
+        }
+        return ast;
+    },
+
+    function transformUnarySplatOperators(ast: AST): AST {
+        if (!(ast instanceof ASTUnaryOp) || ast.op !== "*") return ast.pipe(transformUnarySplatOperators);
+        return new ASTSplatExpression(ast.location, ast.value.pipe(transformUnarySplatOperators));
+    },
+
+    // TODO: remove this requirement?
+    function validateAnnotationParametersAreAllConstant(ast: AST): AST {
+        if (!(ast instanceof ASTAnnotatedValue)) return ast.pipe(validateAnnotationParametersAreAllConstant);
+        for (var i = 0; i < ast.attributes.length; i++) {
+            const attr = ast.attributes[i];
+            if (attr instanceof ASTCall) {
+                const args = attr.args;
+                for (var j = 0; j < args.length; j++) {
+                    const value = args[j]!;
+                    if (!(value instanceof ASTConstant || (value instanceof ASTKeywordArg && value.arg instanceof ASTConstant))) {
+                        throw new ParseError("attribute arguments must all be constants", value.location);
+                    }
+                }
             }
         }
         return ast;

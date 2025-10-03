@@ -7,12 +7,12 @@ export const zzfxFilter: NodeDef = [
     [["sample", null], ["cutoff", null], ["quality", 2]],
     NodeValueType.SCALAR,
     [],
-    sampleRate => {
+    () => {
         var x2 = 0, x1 = 0, y2 = 0, y1 = 0;
-        return args => {
+        return (dt, args) => {
             const sample = args[0]!, cutoff = args[1]!, quality = args[2]!;
             // basically copied from ZzFX
-            var w = TAU * abs(cutoff) * 2 / sampleRate,
+            var w = TAU * abs(cutoff) * 2 * dt,
                 cos_ = cos(w), alpha = sin(w) / 2 / quality,
                 a0 = 1 + alpha, a1 = -2 * cos_ / a0, a2 = (1 - alpha) / a0,
                 b0 = (1 + sgn(cutoff) * cos_) / 2 / a0,
@@ -43,11 +43,11 @@ export const bitcrusher: NodeDef = [
     [["sample", null], ["sampleRate", 8000]],
     NodeValueType.SCALAR,
     [],
-    realSampleRate => {
+    () => {
         var phase = 0, last = 0;
-        return args => {
+        return (dt, args) => {
             const sample = args[0]!, bitcrushSampleRate = args[1]!;
-            phase += bitcrushSampleRate / realSampleRate;
+            phase += bitcrushSampleRate * dt;
             if (phase >= 1) {
                 phase -= (phase | 0);
                 last = sample;
@@ -72,27 +72,27 @@ export const delay: NodeDef = [
     [["sample", null], ["time", 0]],
     NodeValueType.SCALAR,
     [],
-    sampleRate => {
-        var len = 1 << 16;
+    () => {
+        var len = 1 << 14; // ~ 0.3 seconds of audio at 48kHz
         var buffer = new Float32Array(len);
         var pos = 0;
-        return args => {
+        return (dt, args) => {
             const sample = args[0]!, delayTime = args[1]!;
-            const delaySamples = sampleRate * delayTime;
+            const delaySamples = delayTime / dt;
             // len is always a power of 2
             if (delaySamples > len) {
                 var newLen = len << 1;
                 const newBuffer = new Float32Array(len);
                 // poor man's memcpy to make it wrap right
                 // (.set() is just a singular memcpy with no wrapping)
-                for (var i = 0; i < len; i++) newBuffer[i] = buffer[(pos + i) % len]!;
+                for (var i = 0; i < len; i++) newBuffer[i] = buffer[(pos + i) & (len - 1)]!;
                 buffer = newBuffer;
                 pos = len;
                 len = newLen;
             }
-            const out = buffer[((pos + len - delaySamples) | 0) % len]!;
+            const out = buffer[(pos + len - delaySamples) & (len - 1)]!;
             buffer[pos] = sample;
-            pos = (pos + 1) % len;
+            pos = (pos + 1) & (len - 1);
             return out;
         }
     }

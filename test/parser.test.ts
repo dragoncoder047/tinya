@@ -1,5 +1,6 @@
 import { test } from "bun:test";
 import {
+    ASTAnnotatedValue,
     ASTAssignment,
     ASTBinaryOp,
     ASTBlock,
@@ -14,7 +15,8 @@ import {
     ASTMapping,
     ASTNameReference,
     ASTParameterDescriptor,
-    ASTStringConstant,
+    ASTPipePlaceholder,
+    ASTSplatExpression,
     ASTSymbol,
     ASTTemplate,
     ASTUnaryOp
@@ -37,25 +39,37 @@ describe("parse primitive values", () => {
     });
     test("regular string", () => {
         expectAST('"hello!\\nworld!"', {
-            __class__: ASTStringConstant,
+            __class__: ASTConstant,
             value: "hello!\nworld!"
         });
     });
     test("raw string", () => {
         expectAST("'hello!\\nworld!'", {
-            __class__: ASTStringConstant,
+            __class__: ASTConstant,
             value: "hello!\\nworld!"
+        });
+    });
+    test("string with escaped quote", () => {
+        expectAST('"hello \\"quoted\\" world"', {
+            __class__: ASTConstant,
+            value: 'hello "quoted" world',
+        });
+    });
+    test("raw string with escaped quote", () => {
+        expectAST("'hello \\'quoted\\' world'", {
+            __class__: ASTConstant,
+            value: "hello 'quoted' world",
         });
     });
     test("Unicode escape", () => {
         expectAST('"\\u{1F914}"', {
-            __class__: ASTStringConstant,
+            __class__: ASTConstant,
             value: "\u{1F914}"
         });
     });
     test("ignore Unicode escape in raw string", () => {
         expectAST("'\\u{1F914}'", {
-            __class__: ASTStringConstant,
+            __class__: ASTConstant,
             value: "\\u{1F914}"
         });
     });
@@ -168,6 +182,52 @@ describe("parse expressions", () => {
             right: {
                 __class__: ASTNameReference,
                 name: "x"
+            }
+        });
+    });
+    test("parses splat form", () => {
+        expectAST("foo(*bar())", {
+            __class__: ASTCall,
+            name: "foo",
+            args: [
+                {
+                    __class__: ASTSplatExpression,
+                    value: {
+                        __class__: ASTCall,
+                        name: "bar",
+                        args: []
+                    }
+                }
+            ]
+        })
+    });
+    test("parses matrix multiplication form with correct precedence", () => {
+        expectAST("a^t @ b + c", {
+            __class__: ASTBinaryOp,
+            op: "+",
+            left: {
+                __class__: ASTBinaryOp,
+                op: "@",
+                left: {
+                    __class__: ASTBinaryOp,
+                    op: "^",
+                    left: {
+                        __class__: ASTNameReference,
+                        name: "a"
+                    },
+                    right: {
+                        __class__: ASTNameReference,
+                        name: "t"
+                    }
+                },
+                right: {
+                    __class__: ASTNameReference,
+                    name: "b"
+                }
+            },
+            right: {
+                __class__: ASTNameReference,
+                name: "c"
             }
         });
     });
@@ -431,19 +491,13 @@ describe("parse definition", () => {
     });
 });
 describe("parse block of commas", () => {
-    test("leading and empty middle and trailing comma", () => {
+    test("defaults at all but end get trimmed", () => {
         expectAST(",1, ,2, 3,", {
             __class__: ASTBlock,
             body: [
                 {
-                    __class__: ASTDefaultPlaceholder
-                },
-                {
                     __class__: ASTConstant,
                     value: 1,
-                },
-                {
-                    __class__: ASTDefaultPlaceholder
                 },
                 {
                     __class__: ASTConstant,
@@ -489,20 +543,12 @@ describe("parse template and interpolation", () => {
                     {
                         __class__: ASTCall,
                         name: "foo",
-                        args: [
-                            {
-                                __class__: ASTDefaultPlaceholder
-                            }
-                        ]
+                        args: []
                     },
                     {
                         __class__: ASTCall,
                         name: "bar",
-                        args: [
-                            {
-                                __class__: ASTDefaultPlaceholder
-                            }
-                        ]
+                        args: []
                     },
                 ]
             }
@@ -517,11 +563,7 @@ describe("parse template and interpolation", () => {
                     {
                         __class__: ASTCall,
                         name: "foo",
-                        args: [
-                            {
-                                __class__: ASTDefaultPlaceholder
-                            }
-                        ]
+                        args: []
                     },
                     {
                         __class__: ASTInterpolation,
@@ -534,4 +576,203 @@ describe("parse template and interpolation", () => {
             }
         });
     })
+});
+
+describe("pipeline placeholder", () => {
+    test("parses pipe placeholder form", () => {
+        expectAST("bar(#, 1, #)", {
+            __class__: ASTCall,
+            name: "bar",
+            args: [
+                {
+                    __class__: ASTPipePlaceholder,
+                },
+                {
+                    __class__: ASTConstant,
+                    value: 1
+                },
+                {
+                    __class__: ASTPipePlaceholder,
+                }
+            ]
+        })
+    });
+});
+describe("parses and attaches attributes", () => {
+    test("simple attributes on a definition", () => {
+        expectAST("#!preset foo(a, b) :- 1", {
+            __class__: ASTAnnotatedValue,
+            attributes: [
+                {
+                    __class__: ASTNameReference,
+                    name: "preset"
+                }
+            ],
+            value: {
+                __class__: ASTDefine,
+                name: "foo",
+                parameters: [
+                    {
+                        __class__: ASTNameReference,
+                        name: "a",
+                    },
+                    {
+                        __class__: ASTNameReference,
+                        name: "b"
+                    }
+                ],
+                body: {
+                    __class__: ASTConstant,
+                    value: 1,
+                }
+            }
+        });
+    });
+    test("complex attribute on a definition", () => {
+        expectAST("#!preset('FM Sine') fmSine(a) :- 1", {
+            __class__: ASTAnnotatedValue,
+            attributes: [
+                {
+                    __class__: ASTCall,
+                    name: "preset",
+                    args: [
+                        {
+                            __class__: ASTConstant,
+                            value: "FM Sine"
+                        },
+                    ]
+                }
+            ],
+            value: {
+                __class__: ASTDefine,
+                name: "fmSine",
+                parameters: [
+                    {
+                        __class__: ASTNameReference,
+                        name: "a",
+                    },
+                ],
+                body: {
+                    __class__: ASTConstant,
+                    value: 1,
+                }
+            }
+        });
+    });
+    test("complex attribute 2", () => {
+        expectAST("#!preset('FM Sine', category: 'Retro') fmSine(a) :- 1", {
+            __class__: ASTAnnotatedValue,
+            attributes: [
+                {
+                    __class__: ASTCall,
+                    name: "preset",
+                    args: [
+                        {
+                            __class__: ASTConstant,
+                            value: "FM Sine"
+                        },
+                        {
+                            __class__: ASTKeywordArg,
+                            name: "category",
+                            arg: {
+                                __class__: ASTConstant,
+                                value: "Retro"
+                            }
+                        }
+                    ]
+                }
+            ],
+            value: {
+                __class__: ASTDefine,
+                name: "fmSine",
+                parameters: [
+                    {
+                        __class__: ASTNameReference,
+                        name: "a",
+                    },
+                ],
+                body: {
+                    __class__: ASTConstant,
+                    value: 1,
+                }
+            }
+        });
+    });
+    test("simple attributes as a value in context", () => {
+        expectAST("zz(#!pitch) + 1", {
+            __class__: ASTBinaryOp,
+            op: "+",
+            left: {
+                __class__: ASTCall,
+                name: "zz",
+                args: [
+                    {
+                        __class__: ASTAnnotatedValue,
+                        value: null,
+                        attributes: [
+                            {
+                                __class__: ASTNameReference,
+                                name: "pitch"
+                            }
+                        ]
+                    }
+                ]
+            },
+            right: {
+                __class__: ASTConstant,
+                value: 1
+            }
+        })
+    });
+    test("complex attributes as a value", () => {
+        expectAST("#!mod(0, 1)", {
+            __class__: ASTAnnotatedValue,
+            attributes: [
+                {
+                    __class__: ASTCall,
+                    name: "mod",
+                    args: [
+                        {
+                            __class__: ASTConstant,
+                            value: 0
+                        },
+                        {
+                            __class__: ASTConstant,
+                            value: 1
+                        }
+                    ]
+                }
+            ],
+            value: null
+        });
+    });
+    test("attribute used as value if cannot annotate expression", () => {
+        expectAST("#!z + y", {
+            __class__: ASTBinaryOp,
+            op: "+",
+            left: {
+                __class__: ASTAnnotatedValue,
+                attributes: [
+                    {
+                        __class__: ASTNameReference,
+                        name: "z",
+                    }
+                ],
+                value: null
+            },
+            right: {
+                __class__: ASTNameReference,
+                name: "y"
+            }
+        });
+    });
+    test("EOF'ed attribute", () => {
+        expectParseError("#!", "expected attribute after '#!'")
+    });
+    test("attribute in invalid location", () => {
+        expectParseError("a #!z + y", "expected operator before value");
+    });
+    test("attribute needs constant arguments", () => {
+        expectParseError("#!foo(a + b)", "attribute arguments must all be constants");
+    });
 });

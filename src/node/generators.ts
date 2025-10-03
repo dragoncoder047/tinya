@@ -6,11 +6,11 @@ export const zzfxOscillator: NodeDef = [
     [["frequency", null], ["shape", 0], ["distortion", 1], ["noise", 0], ["phaseMod", 0]],
     NodeValueType.SCALAR,
     [, { sine: 0, triangle: 1, sawtooth: 2, tangent: 3, noise3: 4 }],
-    sampleRate => {
+    () => {
         var phase = 0, sampleNo = 0;
-        return args => {
+        return (dt, args) => {
             const frequency = args[0]!, shape = args[1]!, distortion = args[2]!, noise = args[3]!, phaseMod = args[4]!;
-            const sample = (shape > 3 ? noise3 : shape > 2 ? tan : shape > 1 ? saw : shape ? tri : sin)(phaseMod * TAU + (phase += (frequency * TAU / sampleRate) * (1 + noise * noise5(sampleNo++))));
+            const sample = (shape > 3 ? noise3 : shape > 2 ? tan : shape > 1 ? saw : shape ? tri : sin)(phaseMod * TAU + (phase += (frequency * TAU * dt) * (1 + noise * noise5(sampleNo++))));
             return sgn(sample) * (abs(sample) ** distortion);
         }
     }

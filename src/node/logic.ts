@@ -6,7 +6,7 @@ export const shimmered: NodeDef = [
     [],
     () => {
         var oldValue = 0, out = 0;
-        return args => {
+        return (dt, args) => {
             const value = args[0]!, amount = args[1]!;
             if (oldValue !== value) {
                 out = value + (Math.random() - .5) * amount * value;
@@ -31,13 +31,13 @@ export const integrator: NodeDef = [
     [["derivative", 0], ["resetClock", 0], ["resetValue", 0], ["boundaryMode", 1], ["low", -Infinity], ["high", Infinity], ["sampleMode", 1]],
     NodeValueType.SCALAR,
     [, , , { clamp: 1, wrap: 0 }, , , { integrate: 1, accumulate: 0 }],
-    sampleRate => {
+    () => {
         var integral = 0, prevReset = 0;
-        return args => {
+        return (dt, args) => {
             const integrand = args[0]!, reset = args[1]!, resetTo = args[2]!, boundaryMode = args[3]!, low = Math.min(args[4]!, args[5]!), high = Math.max(args[4]!, args[5]!), sampleMode = args[6]!;
             if (reset > 0 && prevReset <= 0) integral = resetTo;
             prevReset = reset;
-            integral += integrand / (sampleMode ? sampleRate : 1);
+            integral += integrand * (sampleMode ? dt : 1);
             const difference = high - low;
             if (boundaryMode === 0 && difference > 0) {
                 while (integral < low) integral += difference;
@@ -71,11 +71,11 @@ export const clock: NodeDef = [
     [["period", 1], ["speed", 1]],
     NodeValueType.SCALAR,
     [],
-    sampleRate => {
+    () => {
         var time = Infinity;
-        return args => {
+        return (dt, args) => {
             const period = args[0]!, speedScale = args[1]!;
-            time += speedScale / sampleRate;
+            time += speedScale * dt;
             if (time >= period) {
                 time = 0;
                 return 1;

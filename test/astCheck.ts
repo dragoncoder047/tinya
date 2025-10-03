@@ -8,7 +8,7 @@ const F = "<test string>";
 type Constructor<T> = new (...args: any[]) => T;
 interface ASTSpec {
     __class__?: Constructor<AST>;
-    [p: string]: Constructor<AST> | string | number | ASTSpec | ASTSpec[] | undefined;
+    [p: string]: Constructor<AST> | string | number | ASTSpec | ASTSpec[] | undefined | null;
 }
 function checkAST(ast: any, spec: ASTSpec, path: string) {
     const failMsg = "AST failed to match at " + path;
@@ -21,7 +21,7 @@ function checkAST(ast: any, spec: ASTSpec, path: string) {
             for (var i = 0; i < desc.length; i++) {
                 checkAST(ast[prop][i], desc[i]!, path + "." + prop + "[" + i + "]");
             }
-        } else if (typeof desc === "object") {
+        } else if (typeof desc === "object" && desc !== null) {
             checkAST(ast[prop], desc, path + "." + prop);
         } else {
             expect(ast[prop], failMsg).toEqual(desc);
@@ -33,7 +33,7 @@ export function expectAST(p: string, spec: ASTSpec) {
         checkAST(parse(p, F), spec, "");
     } catch (e) {
         if (e instanceof ParseError) {
-            expect.unreachable(e.displayOn({ [F]: p }));
+            expect.unreachable(e.displayOn({ [F]: p }) + e.stack);
         }
         else throw e;
     }

@@ -1,55 +1,72 @@
+/** constant used to note that an operator is not valid in this context (unary or binary) */
+export const INVALID = -1;
+
 class Operator {
+    cb: ((this: never, a: any, b: any) => any) | null = null;
+    cu: ((this: never, a: any) => any) | null = null;
     constructor(
-        public bin: number | undefined,
-        public unary: number | undefined = undefined,
-        public right: boolean = false
-    ) { }
+        public b: number,
+        public u: number = INVALID,
+        public r: boolean = false) { }
+    code(b: this["cb"], u: this["cu"] = null) {
+        this.cb = b;
+        this.cu = u;
+    }
 }
+
+const op: (...args: ConstructorParameters<typeof Operator>) => Operator = (b, u, r) => new Operator(b, u, r);
+
 export const OPERATORS: Record<string, Operator> = {
+    // attribute sigil
+    "#!": op(INVALID, -Infinity),
     // symbol name
-    ".": new Operator(undefined, -Infinity),
+    ".": op(INVALID, -Infinity),
     // interpolate
-    "&": new Operator(undefined, 0),
-    // length
-    "#": new Operator(undefined, 0),
+    "&": op(INVALID, 0),
+    // length or as 0-ary pipeline placeholder (that is handled specially)
+    "#": op(INVALID, 0),
     // boolean NOT
-    "!": new Operator(undefined, 0),
+    "!": op(INVALID, 0),
     // power
-    "^": new Operator(1, undefined, true),
-    // multiply / divide
-    "*": new Operator(3),
-    "/": new Operator(3),
+    "^": op(1, INVALID, true),
+    // multiply or splat operator
+    "*": op(3, -Infinity),
+    // divide
+    "/": op(3),
+    // matrix multiply
+    "@": op(3),
     // add
-    "+": new Operator(4),
+    "+": op(4),
     // subtract, negate
-    "-": new Operator(4, 2),
+    "-": op(4, 2),
     // boolean OR / AND
-    "||": new Operator(5),
-    "&&": new Operator(5),
+    "||": op(5),
+    "&&": op(5),
     // comparison
-    "==": new Operator(6),
-    ">=": new Operator(6),
-    ">": new Operator(6),
-    "<=": new Operator(6),
-    "<": new Operator(6),
-    "!=": new Operator(6),
+    "==": op(6),
+    ">=": op(6),
+    ">": op(6),
+    "<=": op(6),
+    "<": op(6),
+    "!=": op(6),
     // pipe
-    "|>": new Operator(7),
+    "|>": op(7),
     // each pipe
-    "*>": new Operator(7),
+    "*>": op(7),
     // reduce pipe
-    "+>": new Operator(7),
+    "+>": op(7),
     // conditional in 2 parts (treated as binary and postprocessed for simplicity)
-    ":": new Operator(8),
-    "?": new Operator(9),
+    ":": op(8),
+    "?": op(9),
     // assignment operator (no overloads and handles specially, just here so it can be parsed in the right spot)
-    "=": new Operator(10),
+    "=": op(10),
     // mapping operator (for inside lists)
-    "=>": new Operator(10),
+    "=>": op(10),
     // define operator (handled specially)
-    ":-": new Operator(11),
+    ":-": op(11),
     // statement separator
-    ",": new Operator(12),
+    ",": op(12),
+    ";": op(12),
 };
 
 

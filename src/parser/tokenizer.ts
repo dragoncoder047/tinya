@@ -7,6 +7,7 @@ export enum TokenType {
     NUMBER,
     PAREN,
     OPERATOR,
+    PIPE_PLACEHOLDER,
     STRING_BEGIN,
     STRING_END,
     STRING_BODY,
@@ -15,10 +16,10 @@ export enum TokenType {
 }
 
 export class Token {
-    constructor(public text: string,
-        public location: LocationTrace,
-        public type: TokenType,
-        public assign?: LocationTrace) { }
+    constructor(public t: string,
+        public s: LocationTrace,
+        public k: TokenType,
+        public a?: LocationTrace) { }
 }
 
 type Rule = [State[], RegExp, keepType?: TokenType | undefined, stateOp?: State | undefined];
@@ -67,8 +68,7 @@ export function tokenize(source: string, filename: string) {
     const out: Token[] = [];
     const stateStack: State[] = [State.INITIAL];
     tokens: while (source.length > 0) {
-        for (var rule of TOKENIZE_RULES) {
-            const [curStates, regex, type, newState] = rule;
+        for (var [curStates, regex, type, newState] of TOKENIZE_RULES) {
             if (curStates.every(s => stateStack.at(-1) !== s)) continue;
             const match = regex.exec(source);
             if (match) {
