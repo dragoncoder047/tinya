@@ -751,8 +751,78 @@ describe("parses and attaches attributes", () => {
     test("attribute in invalid location", () => {
         expectParseError("a #!z + y", "expected operator before value");
     });
-    test("attribute needs constant arguments", () => {
-        expectParseError("#!foo(a + b)", "attribute arguments must all be constants");
+});
+describe("expand simple pipe operators", () => {
+    test("dumb pipe", () => {
+        expectAST("a |> #", {
+            __class__: AST.Name,
+            name: "a",
+        });
+    });
+    test("simple pipe expansion", () => {
+        expectAST("foo() |> # * 2", {
+            __class__: AST.BinaryOp,
+            op: "*",
+            left: {
+                __class__: AST.Call,
+                name: "foo",
+                args: []
+            },
+            right: {
+                __class__: AST.Constant,
+                value: 2
+            }
+        });
+    });
+    test("chained pipe expansion", () => {
+        expectAST("foo() |> bar(#) |> baz(#)", {
+            __class__: AST.Call,
+            name: "baz",
+            args: [
+                {
+                    __class__: AST.Call,
+                    name: "bar",
+                    args: [
+                        {
+                            __class__: AST.Call,
+                            name: "foo",
+                            args: []
+                        }
+                    ]
+                }
+            ]
+        });
+    });
+    test("multiple targets for expansion", () => {
+        expectAST("foo() |> (# ? # : 1)", {
+            __class__: AST.Block,
+            body: [
+                {
+                    __class__: AST.AssignToGensym,
+                    name: "<test string>:0:6",
+                    value: {
+                        __class__: AST.Call,
+                        name: "foo",
+                        args: []
+                    }
+                },
+                {
+                    __class__: AST.Conditional,
+                    cond: {
+                        __class__: AST.Gensym,
+                        id: "<test string>:0:6"
+                    },
+                    caseTrue: {
+                        __class__: AST.Gensym,
+                        id: "<test string>:0:6"
+                    },
+                    caseFalse: {
+                        __class__: AST.Constant,
+                        value: 1
+                    }
+                }
+            ]
+        });
     });
 });
 describe("constant folding", () => {
@@ -787,8 +857,14 @@ describe("constant folding", () => {
             ]
         });
     });
+    test("folding with strings", () => {
+        expectAST("'Hello, ' + 'World!'", {
+            __class__: AST.Constant,
+            value: "Hello, World!"
+        });
+    });
     test("list splat constant folding", () => {
-        expectAST("[a, *[b]]", {
+        expectAST("[a, *[b, *[c], d]]", {
             __class__: AST.List,
             values: [
                 {
@@ -798,8 +874,80 @@ describe("constant folding", () => {
                 {
                     __class__: AST.Name,
                     name: "b",
+                },
+                {
+                    __class__: AST.Name,
+                    name: "c",
+                },
+                {
+                    __class__: AST.Name,
+                    name: "d",
                 }
             ]
-        })
-    })
+        });
+    });
+    test("call site constant folding", () => {
+        expectAST("foo(a, b, *[c, d])", {
+            __class__: AST.Call,
+            name: "foo",
+            args: [
+                {
+                    __class__: AST.Name,
+                    name: "a",
+                },
+                {
+                    __class__: AST.Name,
+                    name: "b",
+                },
+                {
+                    __class__: AST.Name,
+                    name: "c",
+                },
+                {
+                    __class__: AST.Name,
+                    name: "d",
+                }
+            ]
+        });
+    });
+    test("pipe constant folding", () => {
+        expectAST("100 + 245 |> ('abc' + #)", {
+            __class__: AST.Constant,
+            value: "abc345"
+        });
+    });
+    test("length constant folding for a constant length list", () => {
+        expectAST("1 |> (#[foo, #bar]+#)", {
+            __class__: AST.Constant,
+            value: 3
+        });
+    });
+    test("length constant folding for a constant length list with splats", () => {
+        expectAST("1 |> (#[foo, *[1, 2, 3]]+#)", {
+            __class__: AST.Constant,
+            value: 5
+        });
+    });
+    test("no length constant folding for a list with unfoldable splats in it", () => {
+        expectAST("#[1, *a]", {
+            __class__: AST.UnaryOp,
+            op: "#",
+            value: {
+                __class__: AST.List,
+                values: [
+                    {
+                        __class__: AST.Constant,
+                        value: 1,
+                    },
+                    {
+                        __class__: AST.SplatValue,
+                        value: {
+                            __class__: AST.Name,
+                            name: "a"
+                        }
+                    }
+                ]
+            }
+        });
+    });
 });

@@ -2,6 +2,7 @@ import { str } from "../utils";
 import { AST } from "./ast";
 import { liftCommas } from "./core";
 import { ErrorNote, ParseError } from "./errors";
+import { countPlaceholdersIn, isPipe, replacePlaceholdersWith } from "./pipe";
 
 const TRANSFORM_PASSES = [
 
@@ -204,22 +205,20 @@ const TRANSFORM_PASSES = [
         return new AST.SplatValue(ast.loc, ast.value.pipe(transformUnarySplatOperators));
     },
 
-    // TODO: remove this requirement?
-    function validateAnnotationParametersAreAllConstant(ast: AST.Node): AST.Node {
-        if (!(ast instanceof AST.AnnotatedValue)) return ast.pipe(validateAnnotationParametersAreAllConstant);
-        for (var i = 0; i < ast.attributes.length; i++) {
-            const attr = ast.attributes[i];
-            if (attr instanceof AST.Call) {
-                const args = attr.args;
-                for (var j = 0; j < args.length; j++) {
-                    const value = args[j]!;
-                    if (!(value instanceof AST.Constant || (value instanceof AST.KeywordArgument && value.arg instanceof AST.Constant))) {
-                        throw new ParseError("attribute arguments must all be constants", value.loc);
-                    }
-                }
-            }
+    function expandPipeOperators(ast: AST.Node): AST.Node {
+        ast = ast.pipe(expandPipeOperators);
+        if (!isPipe(ast)) return ast;
+        const sym = new AST.Gensym(ast.loc, [ast.loc.filename, ast.loc.line, ast.loc.col].join(":"));
+        const arg = ast.left.simp();
+        const expr = ast.right;
+        const numPlaceholders = countPlaceholdersIn(expr);
+        if (numPlaceholders === 0) {
+            throw new ParseError("missing '#' placeholder in pipe expression", expr.loc, [new ErrorNote("note: required by this pipe operator", ast.loc)]);
+        } else if (numPlaceholders > 1 && !(arg instanceof AST.Constant)) {
+            return new AST.Block(ast.loc, [new AST.AssignToGensym(ast.loc, sym.id, arg), replacePlaceholdersWith(expr, sym)]);
+        } else {
+            return replacePlaceholdersWith(expr, arg);
         }
-        return ast;
     }
 
 ];

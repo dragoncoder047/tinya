@@ -45,8 +45,15 @@ export namespace AST {
     export class Call extends Node {
         constructor(trace: LocationTrace, public name: string, public args: Node[]) { super(trace); };
         edgemost(left: boolean): Node { return left ? this : this.args.at(-1)?.edgemost(left) ?? this; }
-        pipe(fn: (node: Node) => Node) { return new Call(this.loc, this.name, this.args.map(fn)); }
-        simp(): Node { return new Call(this.loc, this.name, this.args.map(a => a.simp())); }
+        pipe(fn: (node: Node) => Node) { return new Call(this.loc, this.name, this.args.map(a => fn(a))); }
+        simp(): Node {
+            const values = this.args.flatMap(a => {
+                const v = a.simp();
+                if (v instanceof SplatValue && v.value instanceof List) return v.value.values;
+                return [v];
+            });
+            return new Call(this.loc, this.name, values);
+        }
     }
 
     export class List extends Node {
@@ -110,6 +117,10 @@ export namespace AST {
             if (val instanceof Constant && (fn = OPERATORS[this.op]?.cu)) {
                 return new Constant(this.loc, fn(val.value));
             }
+            // Special case length of an immediate list
+            if (val instanceof List && this.op === "#" && val.values.every(v => !(v instanceof SplatValue))) {
+                return new Constant(this.loc, OPERATORS["#"]!.cu!(val.values));
+            }
             return new UnaryOp(this.loc, this.op, val);
         }
     }
@@ -159,6 +170,17 @@ export namespace AST {
     }
 
     export class PipePlaceholder extends Leaf {
+    }
+
+    export class Gensym extends Leaf {
+        constructor(trace: LocationTrace, public id: string) { super(trace); }
+    }
+
+    export class AssignToGensym extends Node {
+        constructor(trace: LocationTrace, public name: string, public value: Node) { super(trace); }
+        edgemost(left: boolean): Node { return left ? this : this.value.edgemost(left); }
+        pipe(fn: (node: Node) => Node) { return new AssignToGensym(this.loc, this.name, fn(this.value)); }
+        simp() { return new AssignToGensym(this.loc, this.name, this.value.simp()); }
     }
 
     export class Block extends Node {

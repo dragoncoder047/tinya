@@ -2,8 +2,8 @@
 export const INVALID = -1;
 
 class Operator {
-    cb: ((this: never, a: any, b: any) => any) | null = null;
-    cu: ((this: never, a: any) => any) | null = null;
+    cb: ((this: unknown, a: any, b: any) => any) | null = null;
+    cu: ((this: unknown, a: any) => any) | null = null;
     constructor(
         public b: number,
         public u: number = INVALID,

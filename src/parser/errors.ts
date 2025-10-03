@@ -13,7 +13,7 @@ function formatTrace(trace: LocationTrace, message: string, sources: Record<stri
         const lines = src.split("\n");
         const relevantLine = lines[trace.line] || "";
         const lineNumberString = trace.line + 1 + "";
-        lineInfo = `\n${lineNumberString} | ${relevantLine}\n${" ".repeat(lineNumberString.length)} | ${" ".repeat(trace.col)}^\n`;
+        lineInfo = `\n${lineNumberString} | ${relevantLine}\n${" ".repeat(lineNumberString.length)} | ${" ".repeat(trace.col)}^`;
     }
     return `${trace.filename}:${trace.line + 1}:${trace.col + 1}: ${message}${lineInfo}`;
 }
@@ -27,7 +27,7 @@ export class TinyAError extends Error {
         super(message);
     }
     displayOn(sources: Record<string, string>): string {
-        return formatTrace(this.trace, "error: " + this.message, sources) + this.notes.map(note => "\n" + formatTrace(note.location, note.message, sources)).join("");
+        return formatTrace(this.trace, "error: " + this.message, sources) + this.notes.map(note => "\n" + formatTrace(note.location, note.message, sources)).join("") + "\n";
     }
 }
 

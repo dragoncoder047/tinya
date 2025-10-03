@@ -97,7 +97,7 @@ function pipePlaceholdersHack(tokens: (AST.Node | Token)[]) {
         const before = tokens[i - 1];
         const here = tokens[i];
         const after = tokens[i + 1];
-        if (here instanceof Token && here.t === "#" && commaIsh(before) && commaIsh(after)) {
+        if (here instanceof Token && here.t === "#" && !(before instanceof AST.Node || after instanceof AST.Node)) {
             tokens[i] = new AST.PipePlaceholder(here.s);
         }
     }
