@@ -1,6 +1,6 @@
 import { AST } from "./ast";
 import { LocationTrace, ParseError } from "./errors";
-import { getPrecedence, isRightAssociative } from "./operator";
+import { getPrecedenceAndCheckValidity, isRightAssociative } from "./operator";
 import { Token, TokenType } from "./tokenizer";
 
 export function treeifyExpression(tokens: (AST.Node | Token)[], lift: boolean = false): AST.Node {
@@ -27,7 +27,7 @@ export function treeifyExpression(tokens: (AST.Node | Token)[], lift: boolean = 
                     throw new ParseError("expected a value after operator", token.s);
                 }
                 if (prevWasAtom) {
-                    const precedence = getPrecedence(token, false);
+                    const precedence = getPrecedenceAndCheckValidity(token, false);
                     if (bestBinaryPrecedence > precedence || (bestBinaryPrecedence === precedence && isRightAssociative(token.t))) {
                         bestBinaryPrecedence = precedence;
                         bestBinaryIndex = i;
@@ -35,10 +35,10 @@ export function treeifyExpression(tokens: (AST.Node | Token)[], lift: boolean = 
                 } else {
                     // possible unary operator to lift
                     if (!(tokens[i + 1]! instanceof AST.Node)) continue; // not innermost unary
-                    const mePrecedence = getPrecedence(token, true);
+                    const mePrecedence = getPrecedenceAndCheckValidity(token, true);
                     const opAfter = tokens[i + 2] as Token | undefined;
                     if (opAfter) {
-                        const opAfterPrecedence = getPrecedence(opAfter, false);
+                        const opAfterPrecedence = getPrecedenceAndCheckValidity(opAfter, false);
                         if (opAfterPrecedence < mePrecedence) continue; // don't lift yet
                     }
                     // we can lift this

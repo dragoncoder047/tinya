@@ -42,7 +42,7 @@ function prim(arg: string | number | boolean): string {
 function toJS(ast: AST.Node): string {
     if (ast instanceof AST.AnnotatedValue)
         return ast.value ? code(ast, list(ast.attributes), toJS(ast.value)) : code(ast, list(ast.attributes));
-    if (ast instanceof AST.Constant)
+    if (ast instanceof AST.Value)
         return code(ast, prim(ast.value));
     if (ast instanceof AST.Symbol)
         return code(ast, prim(ast.value));
@@ -90,7 +90,7 @@ const files = { [displayFilename]: input };
 var ast: AST.Node;
 
 try {
-    ast = parse(input, displayFilename);
+    ast = await parse(input, displayFilename);
 } catch (e) {
     if (!(e instanceof ParseError)) throw e;
     process.stderr.write(e.displayOn(files));

@@ -7,8 +7,8 @@ const F = "<test string>";
 
 type Constructor<T> = new (...args: any[]) => T;
 interface ASTSpec {
-    __class__?: Constructor<AST>;
-    [p: string]: Constructor<AST> | string | number | ASTSpec | ASTSpec[] | undefined | null;
+    __class__?: Constructor<AST.Node>;
+    [p: string]: Constructor<AST.Node> | string | number | ASTSpec | ASTSpec[] | undefined | null;
 }
 function checkAST(ast: any, spec: ASTSpec, path: string) {
     const failMsg = "AST failed to match at " + path;
@@ -28,9 +28,9 @@ function checkAST(ast: any, spec: ASTSpec, path: string) {
         }
     }
 }
-export function expectAST(p: string, spec: ASTSpec) {
+export async function expectAST(p: string, spec: ASTSpec) {
     try {
-        checkAST(parse(p, F), spec, "");
+        checkAST(await parse(p, F), spec, "");
     } catch (e) {
         if (e instanceof ParseError) {
             expect.unreachable(e.displayOn({ [F]: p }) + e.stack);
@@ -38,9 +38,9 @@ export function expectAST(p: string, spec: ASTSpec) {
         else throw e;
     }
 }
-export function expectParseError(p: string, error: string, note?: string) {
+export async function expectParseError(p: string, error: string, note?: string) {
     try {
-        parse(p, F);
+        await parse(p, F);
         expect.unreachable("Did not throw an error!");
     } catch (e: any) {
         expect(e).toBeInstanceOf(ParseError);

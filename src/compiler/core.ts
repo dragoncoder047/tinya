@@ -30,7 +30,7 @@ export function parseTokens(tokens: Token[]): AST.Node {
         }
         return tokens[pos++]!;
     };
-    const parseString = (start: Token): AST.Constant => {
+    const parseString = (start: Token): AST.Value => {
         var out = "";
         str: for (; ;) {
             const token = nextToken(true, start);
@@ -47,14 +47,14 @@ export function parseTokens(tokens: Token[]): AST.Node {
                     throw new ParseError("illegal escape sequence", token.s);
             }
         }
-        return new AST.Constant(start.s, out);
+        return new AST.Value(start.s, out);
     }
     const parseThing = (requireNext: boolean, beginParen?: Token): AST.Node | undefined => {
         const token = nextToken(requireNext, beginParen);
         if (token === undefined) return undefined;
         switch (token.k) {
             case TokenType.NUMBER:
-                return new AST.Constant(token.s, parseFloat(token.t));
+                return new AST.Value(token.s, parseFloat(token.t));
             case TokenType.STRING_BEGIN:
                 return parseString(token);
             case TokenType.NAME:

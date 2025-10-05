@@ -3,13 +3,9 @@ import { parseTokens } from "./core";
 import { tokenize } from "./tokenizer";
 import { transformAST } from "./transformers";
 
-export function parse(src: string, filename: string): AST.Node {
-    return transformAST(parseTokens(tokenize(src, filename))).simp();
+export async function parse(src: string, filename: string): Promise<AST.Node> {
+    return (await transformAST(parseTokens(tokenize(src, filename)))).simp();
 }
-
-// export function expandNodeNames(unexpanded: AST.Node): AST.Node {
-    
-// }
 
 /*
 

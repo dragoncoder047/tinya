@@ -4,27 +4,27 @@ export function isPipe(a: AST.Node): a is AST.BinaryOp {
     return a instanceof AST.BinaryOp && a.op === "|>";
 }
 
-export function countPlaceholdersIn(expr: AST.Node): number {
+export async function countPlaceholdersIn(expr: AST.Node): Promise<number> {
     var numPlaceholders = 0;
-    const count = (ast: AST.Node) => {
+    const count = async (ast: AST.Node) => {
         if (ast instanceof AST.PipePlaceholder) numPlaceholders++;
         if (isPipe(ast)) {
-            ast.left.pipe(count);
+            await ast.left.pipe(count);
         } else {
-            ast.pipe(count);
+            await ast.pipe(count);
         }
         return ast;
     }
-    count(expr);
+    await count(expr);
     return numPlaceholders;
 }
 
-export function replacePlaceholdersWith(ast: AST.Node, with_: AST.Node): AST.Node {
+export async function replacePlaceholdersWith(ast: AST.Node, with_: AST.Node): Promise<AST.Node> {
     if (ast instanceof AST.PipePlaceholder) {
         return with_;
     } else if (isPipe(ast)) {
-        return ast.pipe(a => a === ast.left ? a : replacePlaceholdersWith(a, with_));
+        return await ast.pipe(async a => a === ast.left ? a : await replacePlaceholdersWith(a, with_));
     } else {
-        return ast.pipe(a => replacePlaceholdersWith(a, with_))
+        return await ast.pipe(async a => await replacePlaceholdersWith(a, with_))
     }
 }
