@@ -1,4 +1,4 @@
-import { str } from "../utils";
+import { isinstance, str } from "../utils";
 import { AST } from "./ast";
 import { ErrorNote, ParseError } from "./errors";
 import { treeifyExpression } from "./expression";
@@ -6,7 +6,7 @@ import { Token, TokenType } from "./tokenizer";
 
 
 export function liftCommas(expr: AST.Node, force = false): AST.Node[] {
-    return expr instanceof AST.BinaryOp && /^[,;]$/.test(expr.op) && (force || !expr.noLift) ? [...liftCommas(expr.left), ...liftCommas(expr.right)] : [expr];
+    return isinstance(expr, AST.BinaryOp) && /^[,;]$/.test(expr.op) && (force || !expr.noLift) ? [...liftCommas(expr.left), ...liftCommas(expr.right)] : [expr];
 }
 
 // string string string

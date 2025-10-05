@@ -35,7 +35,11 @@
 export const str = JSON.stringify;
 
 const gensymCounters: Record<string, number> = {};
-export const gensym = <T extends string>(prefix: T): `${T}${number}` => {
+export function gensym<T extends string>(prefix: T): `${T}${number}` {
     gensymCounters[prefix] = (gensymCounters[prefix] || 0) + 1;
     return `${prefix}${gensymCounters[prefix]}` as const;
+}
+
+export function isinstance<C>(obj: any, cls: abstract new(...args: any[]) => C): obj is C {
+    return obj instanceof cls;
 }

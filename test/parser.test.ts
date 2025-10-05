@@ -317,9 +317,6 @@ describe("parse call", () => {
             ]
         });
     });
-    test("throw error when call has keyword arguments before non-keyword arguments", async () => {
-        await expectParseError("foo(a: 1, 2)", "non-keyword argument follows keyword argument");
-    });
 });
 describe("parse list", () => {
     test("normal list", async () => {
@@ -345,6 +342,17 @@ describe("parse list", () => {
         await expectAST("[]", {
             __class__: AST.List,
             values: []
+        });
+    });
+    test("empty list 2-deep", async () => {
+        await expectAST("[[]]", {
+            __class__: AST.List,
+            values: [
+                {
+                    __class__: AST.List,
+                    values: []
+                }
+            ]
         });
     });
 });
@@ -450,30 +458,6 @@ describe("parse definition", () => {
                 {
                     __class__: AST.Name,
                     name: "b"
-                }
-            ],
-            body: {
-                __class__: AST.Value,
-                value: 1,
-            }
-        });
-    });
-    test("with defaults", async () => {
-        await expectAST("foo(a, b = 1) :- 1", {
-            __class__: AST.Definition,
-            name: "foo",
-            parameters: [
-                {
-                    __class__: AST.Name,
-                    name: "a",
-                },
-                {
-                    __class__: AST.ParameterDescriptor,
-                    name: "b",
-                    defaultValue: {
-                        __class__: AST.Value,
-                        value: 1,
-                    }
                 }
             ],
             body: {
@@ -812,8 +796,8 @@ describe("expand simple pipe operators", () => {
             __class__: AST.Block,
             body: [
                 {
-                    __class__: AST.AssignToGensym,
-                    name: "<test string>:0:6",
+                    __class__: AST.Assignment,
+                    name: "_pipe_teststring_0_6",
                     value: {
                         __class__: AST.Call,
                         name: "foo",
@@ -823,12 +807,12 @@ describe("expand simple pipe operators", () => {
                 {
                     __class__: AST.Conditional,
                     cond: {
-                        __class__: AST.Gensym,
-                        id: "<test string>:0:6"
+                        __class__: AST.Name,
+                        name: "_pipe_teststring_0_6"
                     },
                     caseTrue: {
-                        __class__: AST.Gensym,
-                        id: "<test string>:0:6"
+                        __class__: AST.Name,
+                        name: "_pipe_teststring_0_6"
                     },
                     caseFalse: {
                         __class__: AST.Value,

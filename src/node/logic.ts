@@ -1,8 +1,8 @@
-import { NodeDef, NodeHelp, NodeValueType } from ".";
+import { NodeDef, NodeHelp, NodeValueType } from "../compiler/env";
 export const shimmered: NodeDef = [
     "shimmered",
     [["value", 0], ["amount", 0.05]],
-    NodeValueType.SCALAR,
+    NodeValueType.NORMAL,
     [],
     () => {
         var oldValue = 0, out = 0;
@@ -29,7 +29,7 @@ export const shimmeredHelp: NodeHelp = {
 export const integrator: NodeDef = [
     "integrate",
     [["derivative", 0], ["resetClock", 0], ["resetValue", 0], ["boundaryMode", 1], ["low", -Infinity], ["high", Infinity], ["sampleMode", 1]],
-    NodeValueType.SCALAR,
+    NodeValueType.NORMAL,
     [, , , { clamp: 1, wrap: 0 }, , , { integrate: 1, accumulate: 0 }],
     () => {
         var integral = 0, prevReset = 0;
@@ -69,7 +69,7 @@ export const integratorHelp: NodeHelp = {
 export const clock: NodeDef = [
     "clock",
     [["period", 1], ["speed", 1]],
-    NodeValueType.SCALAR,
+    NodeValueType.NORMAL,
     [],
     () => {
         var time = Infinity;

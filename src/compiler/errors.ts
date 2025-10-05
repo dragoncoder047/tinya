@@ -2,12 +2,13 @@ export class LocationTrace {
     constructor(
         public line: number,
         public col: number,
-        public filename: string) { }
+        public file: string,
+        public source: [string, LocationTrace] | null = null) { }
 
     static nowhere = new LocationTrace(0, 0, "unknown");
 }
 function formatTrace(trace: LocationTrace, message: string, sources: Record<string, string>): string {
-    const src = sources[trace.filename];
+    const src = sources[trace.file];
     var lineInfo = "";
     if (src) {
         const lines = src.split("\n");
@@ -15,7 +16,7 @@ function formatTrace(trace: LocationTrace, message: string, sources: Record<stri
         const lineNumberString = trace.line + 1 + "";
         lineInfo = `\n${lineNumberString} | ${relevantLine}\n${" ".repeat(lineNumberString.length)} | ${" ".repeat(trace.col)}^`;
     }
-    return `${trace.filename}:${trace.line + 1}:${trace.col + 1}: ${message}${lineInfo}`;
+    return `${trace.file}:${trace.line + 1}:${trace.col + 1}: ${message}${lineInfo}${trace.source ? "\n" + formatTrace(trace.source[1], trace.source[0], sources) : ""}`;
 }
 
 export class ErrorNote {

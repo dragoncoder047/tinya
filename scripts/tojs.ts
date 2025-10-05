@@ -4,6 +4,7 @@ import { parse } from "../src/compiler";
 import { AST } from "../src/compiler/ast";
 import { LocationTrace, ParseError } from "../src/compiler/errors";
 import { optreq } from "./com";
+import { isinstance } from "../src/utils";
 
 const internedStrings = new Map<string, string>();
 var internStringCounter = 0;
@@ -15,19 +16,23 @@ function internString(s: string): string {
 }
 
 function getInternedStrings(): string {
-    return `const ${[...internedStrings].map(([val, name]) => `${name} = ${JSON.stringify(val)}`).join(", ")};`;
+    return `const ${indent([...internedStrings].map(([val, name]) => `\n${name} = ${JSON.stringify(val)}`).join(", "))};`;
+}
+
+function indent(string: string): string {
+    return string ? string.split("\n").map(l => "    " + l).join("\n") : "";
 }
 
 function code(o: AST.Node, ...args: string[]): string {
-    return `new AST.${o.constructor.name}(${location(o.loc)}${args.map(arg => ", " + arg).join("")})`;
+    return `new AST.${o.constructor.name}(${location(o.loc)}${args.length > 0 ? ",\n" : ""}${indent(args.join(",\n"))})`;
 }
 
 function location(t: LocationTrace): string {
-    return `new LocationTrace(${t.line}, ${t.col}, ${internString(t.filename)})`;
+    return `new LocationTrace(${t.line}, ${t.col}, ${internString(t.file)})`;
 }
 
 function liststr(args: string[]): string {
-    return `[${args.join(", ")}]`;
+    return `[${args.length > 0 ? "\n" : ""}${indent(args.join(",\n"))}]`;
 }
 
 function list(args: AST.Node[]): string {
@@ -40,45 +45,45 @@ function prim(arg: string | number | boolean): string {
 }
 
 function toJS(ast: AST.Node): string {
-    if (ast instanceof AST.AnnotatedValue)
+    if (isinstance(ast, AST.AnnotatedValue))
         return ast.value ? code(ast, list(ast.attributes), toJS(ast.value)) : code(ast, list(ast.attributes));
-    if (ast instanceof AST.Value)
+    if (isinstance(ast, AST.Value))
         return code(ast, prim(ast.value));
-    if (ast instanceof AST.Symbol)
+    if (isinstance(ast, AST.Symbol))
         return code(ast, prim(ast.value));
-    if (ast instanceof AST.Name)
+    if (isinstance(ast, AST.Name))
         return code(ast, prim(ast.name));
-    if (ast instanceof AST.Assignment)
+    if (isinstance(ast, AST.Assignment))
         return code(ast, prim(ast.name), toJS(ast.value));
-    if (ast instanceof AST.Call)
+    if (isinstance(ast, AST.Call))
         return code(ast, prim(ast.name), list(ast.args));
-    if (ast instanceof AST.List)
+    if (isinstance(ast, AST.List))
         return code(ast, list(ast.values));
-    if (ast instanceof AST.Definition)
+    if (isinstance(ast, AST.Definition))
         return code(ast, prim(ast.name), list(ast.parameters), toJS(ast.body));
-    if (ast instanceof AST.Template)
+    if (isinstance(ast, AST.Template))
         return code(ast, toJS(ast.result));
-    if (ast instanceof AST.InterpolatedValue)
+    if (isinstance(ast, AST.InterpolatedValue))
         return code(ast, toJS(ast.value));
-    if (ast instanceof AST.SplatValue)
+    if (isinstance(ast, AST.SplatValue))
         return code(ast, toJS(ast.value));
-    if (ast instanceof AST.PipePlaceholder)
+    if (isinstance(ast, AST.PipePlaceholder))
         return code(ast);
-    if (ast instanceof AST.BinaryOp)
+    if (isinstance(ast, AST.BinaryOp))
         return code(ast, prim(ast.op), toJS(ast.left), toJS(ast.right), ...(ast.assign ? [prim(ast.noLift), location(ast.assign)] : []));
-    if (ast instanceof AST.UnaryOp)
+    if (isinstance(ast, AST.UnaryOp))
         return code(ast, prim(ast.op), toJS(ast.value));
-    if (ast instanceof AST.Conditional)
+    if (isinstance(ast, AST.Conditional))
         return code(ast, toJS(ast.cond), toJS(ast.caseTrue), toJS(ast.caseFalse));
-    if (ast instanceof AST.DefaultPlaceholder)
+    if (isinstance(ast, AST.DefaultPlaceholder))
         return code(ast);
-    if (ast instanceof AST.KeywordArgument)
+    if (isinstance(ast, AST.KeywordArgument))
         return code(ast, prim(ast.name), toJS(ast.arg));
-    if (ast instanceof AST.Block)
+    if (isinstance(ast, AST.Block))
         return code(ast, list(ast.body));
-    if (ast instanceof AST.ParameterDescriptor)
+    if (isinstance(ast, AST.ParameterDescriptor))
         return code(ast, prim(ast.name), toJS(ast.enumOptions), toJS(ast.defaultValue));
-    if (ast instanceof AST.Mapping)
+    if (isinstance(ast, AST.Mapping))
         return code(ast, liststr(ast.mapping.map(({ key, val }) => `{ key: ${toJS(key)}, val: ${toJS(val)} }`)));
     throw "unreachable";
 }
@@ -92,7 +97,7 @@ var ast: AST.Node;
 try {
     ast = await parse(input, displayFilename);
 } catch (e) {
-    if (!(e instanceof ParseError)) throw e;
+    if (!isinstance(e, ParseError)) throw e;
     process.stderr.write(e.displayOn(files));
     process.exit(1);
 }
@@ -101,9 +106,13 @@ const js = toJS(ast);
 const pathToSrc = optreq("-p");
 process.stdout.write(`import { AST } from ${JSON.stringify("./" + join(pathToSrc, "compiler/ast"))};
 import { LocationTrace } from ${JSON.stringify("./" + join(pathToSrc, "compiler/errors"))};
+
 export const source = /* @__PURE__ */ ${JSON.stringify(input.split("\n"), null, 4)}.join("\\n");
+
 ${getInternedStrings()}
-const ast = ${js};
+
+export const ast = ${js};
+
 export default ast;
 `);
 process.exit(0);

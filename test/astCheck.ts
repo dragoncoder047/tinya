@@ -5,7 +5,7 @@ import { ErrorNote, ParseError } from "../src/compiler/errors";
 
 const F = "<test string>";
 
-type Constructor<T> = new (...args: any[]) => T;
+type Constructor<T> = abstract new (...args: any[]) => T;
 interface ASTSpec {
     __class__?: Constructor<AST.Node>;
     [p: string]: Constructor<AST.Node> | string | number | ASTSpec | ASTSpec[] | undefined | null;
