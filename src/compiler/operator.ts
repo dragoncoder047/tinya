@@ -1,3 +1,4 @@
+import { matMul } from "../math";
 import { str } from "../utils";
 import { ParseError } from "./errors";
 import type { Token } from "./tokenizer";
@@ -39,7 +40,8 @@ export const OPERATORS: Record<string, Operator> = {
     // divide
     "/": op(3).code((a, b) => a / b),
     // matrix multiply
-    "@": op(3).code((a, b) => { throw "TODO: matrix multiply"; }),
+    // or decorator to mark param or declaration as lazy
+    "@": op(3).code(matMul as any),
     // add
     "+": op(4).code((a, b) => a + b),
     // subtract, negate
@@ -56,11 +58,8 @@ export const OPERATORS: Record<string, Operator> = {
     "!=": op(6).code((a, b) => a != b),
     // pipe
     "|>": op(7),
-    // each pipe
-    "*>": op(7),
-    // reduce pipe
-    "+>": op(7),
     // conditional in 2 parts (treated as binary and postprocessed for simplicity)
+    // colon is also used for keyword arguments
     ":": op(8),
     "?": op(9),
     // assignment operator (no overloads and handles specially, just here so it can be parsed in the right spot)
@@ -70,7 +69,7 @@ export const OPERATORS: Record<string, Operator> = {
     // define operator (handled specially)
     ":-": op(11),
     // statement separator
-    ",": op(12),
+    ",": op(12).code((_, b) => b),
     ";": op(12),
 };
 

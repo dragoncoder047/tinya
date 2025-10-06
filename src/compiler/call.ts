@@ -3,7 +3,7 @@ import { AST } from "./ast";
 import { EvalState, NodeDef } from "./env";
 import { RuntimeError, ErrorNote, LocationTrace } from "./errors";
 
-export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, site: LocationTrace, args: AST.Node[], nodeImpl: NodeDef) {
+export async function processArgsInCall(state: EvalState, doEvalArgs: boolean | boolean[], site: LocationTrace, args: AST.Node[], nodeImpl: NodeDef) {
     const newArgs: AST.Node[] = [];
     const seenArgs: Record<string, AST.Node> = {};
     var firstKW: AST.Node | undefined;
@@ -32,7 +32,7 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
                 if (isinstance(ast, AST.Symbol)) {
                     var value: any = enumChoices?.[ast.value];
                     if ((value ?? undefined) === undefined) {
-                        throw new RuntimeError(enumChoices ? `unknown symbol name ${str(ast.value)} for parameter` : "cannot evaluate symbol here", ast.loc, enumChoices ? [new ErrorNote("note: valid options are: " + Object.keys(enumChoices).join(", "), ast.loc)] : []);
+                        throw new RuntimeError(enumChoices ? `unknown symbol name ${str(ast.value)} for parameter` : "symbol constant not valid here", ast.loc, enumChoices ? [new ErrorNote("note: valid options are: " + Object.keys(enumChoices).join(", "), ast.loc)] : []);
                     }
                     if (!isinstance(value, AST.Value)) {
                         value = new AST.Value(ast.loc, value);
@@ -49,7 +49,7 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
             value = new AST.Value(arg.loc, defaultValue);
         } else if (isinstance(arg, AST.SplatValue)) {
             throw new RuntimeError("splats are only valid in a list", arg.loc, AST.stackToNotes(state.callstack));
-        } else if (doEvalArgs) {
+        } else if ((doEvalArgs as any)[argIndex] ?? doEvalArgs) {
             value = await value.eval(state);
         }
         newArgs[argIndex] = value;

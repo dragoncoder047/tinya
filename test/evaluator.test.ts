@@ -261,6 +261,14 @@ test("node key params", async () => {
         ]
     });
 });
+test("node key no names", async () => {
+    await expectEvalError("foo(.a, 1)", dummyState, "symbol constant not valid here");
+    await expectEvalError("foo(1, .a)", dummyState, 'unknown symbol name "a" for parameter');
+});
+test("too few/many arguments", async () => {
+    await expectEvalError("foo()", dummyState, "missing value for argument bar");
+    await expectEvalError("foo(1, 2, 3)", dummyState, "too many arguments to foo");
+});
 test("looking up macros", async () => {
     await expectEval("reverse3(1, 2, 3)", dummyState, {
         __class__: AST.List,
@@ -340,5 +348,25 @@ test("factorial", async () => {
     await expectEval("factorial(a) :- a > 1 ? {&a * factorial(&a - 1)} : 1; factorial(15)", dummyState, {
         __class__: AST.Value,
         value: 1307674368000
+    });
+});
+test("matrix multiply", async () => {
+    await expectEval("[[1, 2, 3]] @ [[1, 2], [3, 4], [5, 6]]", dummyState, {
+        __class__: AST.List,
+        values: [
+            {
+                __class__: AST.List,
+                values: [
+                    {
+                        __class__: AST.Value,
+                        value: 22
+                    },
+                    {
+                        __class__: AST.Value,
+                        value: 28
+                    }
+                ]
+            }
+        ]
     });
 });
