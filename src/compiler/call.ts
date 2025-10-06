@@ -26,7 +26,22 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
         const argEntry = nodeImpl[1][argIndex]!;
         seenArgs[argEntry[0]] = arg;
         const defaultValue = argEntry[1];
-        var value: AST.Node;
+        const enumChoices = nodeImpl[3][argIndex] ?? null;
+        const walkAndReplaceSymbols = async (ast: AST.Node): Promise<AST.Node> => {
+                if (isinstance(ast, AST.Call)) return ast; // Don't walk into another call's symbols
+                if (isinstance(ast, AST.Symbol)) {
+                    var value: any = enumChoices?.[ast.value];
+                    if ((value ?? undefined) === undefined) {
+                        throw new RuntimeError(enumChoices ? `unknown symbol name ${str(ast.value)} for parameter` : "cannot evaluate symbol here", ast.loc, enumChoices ? [new ErrorNote("note: valid options are: " + Object.keys(enumChoices).join(", "), ast.loc)] : []);
+                    }
+                    if (!isinstance(value, AST.Value)) {
+                        value = new AST.Value(ast.loc, value);
+                    }
+                    return value;
+                }
+                return ast.pipe(walkAndReplaceSymbols);
+            };
+        var value = await walkAndReplaceSymbols(arg);
         if (isinstance(arg, AST.DefaultPlaceholder)) {
             if ((defaultValue ?? null) === null) {
                 throw new RuntimeError(`missing value for argument ${argEntry[0]}`, arg.loc, AST.stackToNotes(state.callstack));
@@ -35,12 +50,7 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
         } else if (isinstance(arg, AST.SplatValue)) {
             throw new RuntimeError("splats are only valid in a list", arg.loc, AST.stackToNotes(state.callstack));
         } else if (doEvalArgs) {
-            const enumChoices = nodeImpl[3][argIndex] ?? null;
-            const newState: EvalState = { ...state, currentEnumChoices: enumChoices };
-            value = await arg.eval(newState);
-        } else {
-            // TODO: need to walk tree and replace symbols in the current arg call WITHOUT evaluating the rest of the tree
-            value = arg;
+            value = await value.eval(state);
         }
         newArgs[argIndex] = value;
     }

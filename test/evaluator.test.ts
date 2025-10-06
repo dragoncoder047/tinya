@@ -34,7 +34,6 @@ beforeEach(() => {
                 () => () => 1,
             ]
         ],
-        currentEnumChoices: null,
         callstack: [],
         annotators: {
             async test(x, args, state) {
@@ -62,7 +61,7 @@ test("variable assignment", async () => {
     });
 });
 test("variable assignment 2", async () => {
-    await expectEval("a = foo(1, 2)", dummyState, {
+    await expectEval("a = foo(1, 2); a", dummyState, {
         __class__: AST.Call,
         name: "foo",
         args: [
@@ -95,6 +94,12 @@ test("simple math", async () => {
     await expectEval("1 + 2 * 3", dummyState, {
         __class__: AST.Value,
         value: 7
+    });
+});
+test("side effects from inside a scope", async () => {
+    await expectEval("f(a) :- b += a; f(1); b", dummyState, {
+        __class__: AST.Value,
+        value: 3
     });
 });
 test("conditional elimination", async () => {
@@ -233,8 +238,24 @@ test("looking up node names", async () => {
         ]
     });
 });
+test("node key params", async () => {
+    await expectEval("foo(1, .opt1)", dummyState, {
+        __class__: AST.Call,
+        name: "foo",
+        args: [
+            {
+                __class__: AST.Value,
+                value: 1,
+            },
+            {
+                __class__: AST.Value,
+                value: 2
+            }
+        ]
+    });
+});
 test("looking up macros", async () => {
-    await expectEval("reverse3(a, b, c)", dummyState, {
+    await expectEval("reverse3(1, 2, 3)", dummyState, {
         __class__: AST.List,
         values: [
             {
@@ -296,24 +317,21 @@ test("definitions", async () => {
     });
     await expectEvalError("y", dummyState, "undefined: y");
 });
-test("fibonacci", async () => {
-    await expectEval("fibonacci(a) :- a > 1 ? {fibonacci(&(a - 1)) + fibonacci(&(a - 2))} : 1", dummyState, {});
-    await expectEval("fibonacci(9)", dummyState, {
+test("definitions with valid options", async () => {
+    await expectEval("func(a: [.a => 1, .b => 2] = -1) :- a; func(.a + .a + .b)", dummyState, {
         __class__: AST.Value,
-        value: 55
+        value: 4
+    });
+});
+test("fibonacci", async () => {
+    await expectEval("fibonacci(a) :- a <= 1 ? a : {fibonacci(&a - 1) + fibonacci(&a - 2)}; fibonacci(20)", dummyState, {
+        __class__: AST.Value,
+        value: 6765
     });
 });
 test("factorial", async () => {
-    await expectEval("factorial(a) :- a > 1 ? {&a * factorial(&a - 1)} : 1", dummyState, {});
-    await expectEval("factorial(6)", dummyState, {
+    await expectEval("factorial(a) :- a > 1 ? {&a * factorial(&a - 1)} : 1; factorial(15)", dummyState, {
         __class__: AST.Value,
-        value: 720
-    });
-});
-test("definitions with valid options", async () => {
-    await expectEval("func(a: [.a => 1, .b => 2] = -1) :- a", dummyState, {});
-    await expectEval("func(.a + .a + .b)", dummyState, {
-        __class__: AST.Value,
-        value: 4
+        value: 1307674368000
     });
 });

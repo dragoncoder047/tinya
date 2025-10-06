@@ -57,13 +57,8 @@ export namespace AST {
 
     export class Symbol extends Leaf {
         constructor(trace: LocationTrace, public value: string) { super(trace); };
-        async eval(state: EvalState): Promise<AST.Node> {
-            const choices = state.currentEnumChoices;
-            const value = choices?.[this.value];
-            if (value !== undefined) {
-                return new Value(this.loc, value);
-            }
-            throw new RuntimeError(choices ? `unknown symbol name ${str(this.value)} for parameter` : "cannot evaluate symbol here", this.loc, choices ? [new ErrorNote("note: valid options are: " + Object.keys(choices).join(", "), this.loc)] : []);
+        async eval(state: EvalState): Promise<never> {
+            throw new RuntimeError("cannot evaluate", this.loc, stackToNotes(state.callstack));
         }
     }
 
@@ -72,7 +67,7 @@ export namespace AST {
         edgemost(left: boolean): Node { return left ? this : this.value.edgemost(left); }
         async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Assignment(this.loc, this.name, await fn(this.value)); }
         async eval(state: EvalState) {
-            return state.env[this.name] = await this.value.eval(state);
+            return (Object.hasOwn(state.env, this.name) ? state.env : state.globalEnv)[this.name] = await this.value.eval(state);
         }
     }
 

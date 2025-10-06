@@ -5,7 +5,6 @@ export interface EvalState {
     globalEnv: Record<string, AST.Node>;
     macros: MacroDef[];
     nodes: NodeDef[];
-    currentEnumChoices: Record<string, any> | null;
     callstack: AST.Call[],
     annotators: Record<string, (
         val: AST.Node | null,
