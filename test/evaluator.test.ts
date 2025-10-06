@@ -102,6 +102,13 @@ test("side effects from inside a scope", async () => {
         value: 3
     });
 });
+test("new inner variables that aren't parameters don't leak", async () => {
+    await expectEval("f(a) :- (x = a * 2, x * a); f(10)", dummyState, {
+        __class__: AST.Value,
+        value: 200
+    });
+    await expectEvalError("x", dummyState, "undefined: x");
+});
 test("conditional elimination", async () => {
     await expectEval("1 == 1 ? a : notdefined", dummyState, {
         __class__: AST.Value,

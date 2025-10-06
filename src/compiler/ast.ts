@@ -67,7 +67,7 @@ export namespace AST {
         edgemost(left: boolean): Node { return left ? this : this.value.edgemost(left); }
         async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Assignment(this.loc, this.name, await fn(this.value)); }
         async eval(state: EvalState) {
-            return (Object.hasOwn(state.env, this.name) ? state.env : state.globalEnv)[this.name] = await this.value.eval(state);
+            return (Object.hasOwn(state.globalEnv, this.name) ? state.globalEnv : state.env)[this.name] = await this.value.eval(state);
         }
     }
 
