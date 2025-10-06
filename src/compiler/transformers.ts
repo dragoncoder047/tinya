@@ -15,8 +15,9 @@ const TRANSFORM_PASSES = [
     },
 
     async function expandInterpolations(ast: AST.Node): Promise<AST.Node> {
-        if (!(isinstance(ast, AST.UnaryOp)) || ast.op !== "&") return ast.pipe(expandInterpolations);
-        return new AST.InterpolatedValue(ast.loc, await ast.value.pipe(expandInterpolations));
+        ast = await ast.pipe(expandInterpolations);
+        if (isinstance(ast, AST.UnaryOp) && ast.op === "&") ast = new AST.InterpolatedValue(ast.loc, ast.value);
+        return ast;
     },
 
     async function expandMapping(ast: AST.Node): Promise<AST.Node> {
@@ -78,7 +79,63 @@ const TRANSFORM_PASSES = [
             }
             throw new ParseError("illegal header", header.edgemost(true).loc, [new ErrorNote("note: definition operator is here", ast.loc)]);
         }
-        return new AST.Definition(header.loc, header.name, header.args, body);
+        const params = header.args;
+        var firstOptional: AST.Node | undefined;
+        const realParams: AST.Node[] = [];
+        for (var i = 0; i < params.length; i++) {
+            const param = params[i]!;
+            if (isinstance(param, AST.Name)) {
+                if (firstOptional) {
+                    throw new ParseError("required parameter follows optional parameter", param.loc, [new ErrorNote("note: first optional parameter is here", firstOptional.loc)]);
+                }
+                realParams.push(param);
+                continue;
+            }
+            if (!isinstance(param, AST.BinaryOp) || (param.op !== ":" && param.op !== "=")) {
+                throw new ParseError("illegal parameter", param.edgemost(true).loc);
+            }
+            var name = param.left, enums: AST.Mapping, default_: AST.Node | undefined;
+            switch (param.op) {
+                case ":":
+                    default_ = undefined;
+                    if (!isinstance(param.right, AST.Mapping)) {
+                        throw new ParseError("expected a mapping", param.right.loc);
+                    }
+                    enums = param.right;
+                    if (!isinstance(name, AST.Name)) {
+                        throw new ParseError("illegal parameter name for options parameter", name.edgemost(false).loc);
+                    }
+                    for (var { key } of enums.mapping) {
+                        if (!isinstance(key, AST.Symbol)) {
+                            throw new ParseError("expected a symbol here", key.edgemost(false).loc, [new ErrorNote(`note: while defining enum options for parameter ${str(name.name)}`, name.loc), ...(isinstance(key, AST.Name) ? [new ErrorNote(`hint: put a "." before the ${str(key.name)} to make it a static symbol instead of a variable`, key.loc)] : [])]);
+                        }
+                    }
+                    break;
+                case "=":
+                    enums = new AST.Mapping(param.loc, []);
+                    if (isinstance(name, AST.BinaryOp) && name.op === ":") {
+                        if (!isinstance(name.right, AST.Mapping)) {
+                            throw new ParseError("expected a mapping", name.right.loc);
+                        }
+                        enums = name.right;
+                        name = name.left;
+                    }
+                    if (!isinstance(name, AST.Name)) {
+                        throw new ParseError("illegal parameter name for optional parameter", name.edgemost(false).loc);
+                    }
+                    default_ = param.right;
+                    break;
+                default:
+                    throw "unreachable";
+            }
+            if (default_ === undefined) {
+                default_ = new AST.DefaultPlaceholder(name.loc);
+            } else {
+                if (!firstOptional) firstOptional = name;
+            }
+            realParams.push(new AST.ParameterDescriptor(name.loc, name.name, enums, default_));
+        }
+        return new AST.Definition(header.loc, header.name, realParams, body);
     },
 
     async function expandAssignments(ast: AST.Node): Promise<AST.Node> {
@@ -113,7 +170,7 @@ const TRANSFORM_PASSES = [
                 ? new ParseError('expected name before ":"', name.edgemost(false).loc)
                 : new ParseError('unexpected ":"', ast.loc));
         }
-        if (!isinstance(parent, AST.Call)) {
+        if (!isinstance(parent, AST.Call) && !isinstance(parent, AST.Definition)) {
             throw new ParseError("named parameter not directly inside a callsite", name.loc);
         }
         return new AST.KeywordArgument(name.loc, name.name, value);
@@ -144,7 +201,7 @@ const TRANSFORM_PASSES = [
         ast = await ast.pipe(expandPipeOperators);
         if (!isPipe(ast)) return ast;
         const sym = new AST.Name(ast.loc, ["_pipe", ast.loc.file.replace(/[^a-z]/ig, ""), ast.loc.line, ast.loc.col].join("_"));
-        const arg = ast.left.simp();
+        const arg = ast.left;
         const expr = ast.right;
         const numPlaceholders = await countPlaceholdersIn(expr);
         if (numPlaceholders === 0) {

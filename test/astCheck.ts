@@ -1,9 +1,10 @@
 import { expect } from "bun:test";
 import { parse } from "../src/compiler";
 import { AST } from "../src/compiler/ast";
-import { ErrorNote, ParseError } from "../src/compiler/errors";
+import { EvalState } from "../src/compiler/env";
+import { ErrorNote, ParseError, RuntimeError, TinyAError } from "../src/compiler/errors";
 
-const F = "<test string>";
+export const F = "<test string>";
 
 type Constructor<T> = abstract new (...args: any[]) => T;
 interface ASTSpec {
@@ -28,22 +29,47 @@ function checkAST(ast: any, spec: ASTSpec, path: string) {
         }
     }
 }
-export async function expectAST(p: string, spec: ASTSpec) {
+export async function expectParse(p: string, spec: ASTSpec) {
     try {
         checkAST(await parse(p, F), spec, "");
     } catch (e) {
-        if (e instanceof ParseError) {
+        if (e instanceof TinyAError) {
             expect.unreachable(e.displayOn({ [F]: p }) + e.stack);
         }
         else throw e;
     }
 }
+
 export async function expectParseError(p: string, error: string, note?: string) {
     try {
         await parse(p, F);
         expect.unreachable("Did not throw an error!");
     } catch (e: any) {
         expect(e).toBeInstanceOf(ParseError);
+        expect(e.message).toEqual(error);
+        if (note !== undefined) {
+            expect(e.notes.map((n: ErrorNote) => n.message)).toContain(note);
+        }
+    }
+}
+
+export async function expectEval(p: string, state: EvalState, spec: ASTSpec) {
+    try {
+        checkAST(await parse(p, F).then(e => e.eval(state)), spec, "");
+    } catch (e) {
+        if (e instanceof TinyAError) {
+            expect.unreachable(e.displayOn({ [F]: p }) + e.stack);
+        }
+        else throw e;
+    }
+}
+
+export async function expectEvalError(p: string, state: EvalState, error: string, note?: string) {
+    try {
+        await parse(p, F).then(e => e.eval(state));
+        expect.unreachable("Did not throw an error!")
+    } catch (e: any) {
+        expect(e).toBeInstanceOf(RuntimeError);
         expect(e.message).toEqual(error);
         if (note !== undefined) {
             expect(e.notes.map((n: ErrorNote) => n.message)).toContain(note);

@@ -1,79 +1,79 @@
 import { test } from "bun:test";
 import { AST } from "../src/compiler/ast";
 import { describe } from "node:test";
-import { expectAST, expectParseError } from "./astCheck";
+import { expectParse, expectParseError } from "./astCheck";
 
 describe("parse primitive values", () => {
     test("number", async () => {
-        await expectAST("123.456e+78", {
+        await expectParse("123.456e+78", {
             __class__: AST.Value,
             value: 123.456e+78
         });
     });
     test("negative number", async () => {
-        await expectAST("-1", {
+        await expectParse("-1", {
             __class__: AST.Value,
             value: -1
         });
     });
     test("regular string", async () => {
-        await expectAST('"hello!\\nworld!"', {
+        await expectParse('"hello!\\nworld!"', {
             __class__: AST.Value,
             value: "hello!\nworld!"
         });
     });
     test("raw string", async () => {
-        await expectAST("'hello!\\nworld!'", {
+        await expectParse("'hello!\\nworld!'", {
             __class__: AST.Value,
             value: "hello!\\nworld!"
         });
-        await expectAST("'hello!\\nworld!'", {
+        await expectParse("'hello!\\nworld!'", {
             __class__: AST.Value,
             value: "hello!\\nworld!"
         });
     });
     test("string with escaped quote", async () => {
-        await expectAST('"hello \\"quoted\\" world"', {
+        await expectParse('"hello \\"quoted\\" world"', {
             __class__: AST.Value,
             value: 'hello "quoted" world',
         });
     });
     test("raw string with escaped quote", async () => {
-        await expectAST("'hello!\\nworld!'", {
+        await expectParse("'hello!\\nworld!'", {
             __class__: AST.Value,
             value: "hello!\\nworld!"
         });
     });
     test("raw string with escaped quote", async () => {
-        await expectAST("'hello!\\nworld!'", {
+        await expectParse("'hello!\\nworld!'", {
             __class__: AST.Value,
             value: "hello!\\nworld!"
         });
-        await expectAST("'hello \\'quoted\\' world'", {
+        await expectParse("'hello \\'quoted\\' world'", {
             __class__: AST.Value,
             value: "hello 'quoted' world",
         });
     });
     test("Unicode escape", async () => {
-        await expectAST('"\\u{1F914}"', {
+        await expectParse('"\\u{1F914}"', {
             __class__: AST.Value,
             value: "\u{1F914}"
         });
     });
     test("ignore Unicode escape in raw string", async () => {
-        await expectAST("'\\u{1F914}'", {
+        await expectParse("'\\u{1F914}'", {
             __class__: AST.Value,
             value: "\\u{1F914}"
         });
     });
     test("symbol", async () => {
-        await expectAST(".foo", {
+        await expectParse(".foo", {
             __class__: AST.Symbol,
             value: "foo"
         });
     });
     test("variable name", async () => {
-        await expectAST("a", {
+        await expectParse("a", {
             __class__: AST.Name,
             name: "a"
         });
@@ -81,7 +81,7 @@ describe("parse primitive values", () => {
 });
 describe("parse expressions", () => {
     test("implicit operator precedence", async () => {
-        await expectAST("a + b * c", {
+        await expectParse("a + b * c", {
             __class__: AST.BinaryOp,
             op: "+",
             left: {
@@ -103,7 +103,7 @@ describe("parse expressions", () => {
         });
     });
     test("parens force order", async () => {
-        await expectAST("(a + 2) * 3", {
+        await expectParse("(a + 2) * 3", {
             __class__: AST.BinaryOp,
             op: "*",
             left: {
@@ -125,7 +125,7 @@ describe("parse expressions", () => {
         });
     });
     test("exponentiation is right associative", async () => {
-        await expectAST("2 ^ a ^ 4", {
+        await expectParse("2 ^ a ^ 4", {
             __class__: AST.BinaryOp,
             op: "^",
             left: {
@@ -147,7 +147,7 @@ describe("parse expressions", () => {
         });
     });
     test("unary minus comes after exponentiation", async () => {
-        await expectAST("-a ^ x", {
+        await expectParse("-a ^ x", {
             __class__: AST.UnaryOp,
             op: "-",
             value: {
@@ -165,7 +165,7 @@ describe("parse expressions", () => {
         });
     });
     test("unary minus doesn't come after exponentiation with a number", async () => {
-        await expectAST("-1 ^ x", {
+        await expectParse("-1 ^ x", {
             __class__: AST.BinaryOp,
             op: "^",
             left: {
@@ -179,7 +179,7 @@ describe("parse expressions", () => {
         });
     });
     test("parses splat form", async () => {
-        await expectAST("foo(*bar())", {
+        await expectParse("foo(*bar())", {
             __class__: AST.Call,
             name: "foo",
             args: [
@@ -195,7 +195,7 @@ describe("parse expressions", () => {
         })
     });
     test("parses matrix multiplication form with correct precedence", async () => {
-        await expectAST("a^t @ b + c", {
+        await expectParse("a^t @ b + c", {
             __class__: AST.BinaryOp,
             op: "+",
             left: {
@@ -241,7 +241,7 @@ describe("parse expressions", () => {
 });
 describe("parse assignment statements", () => {
     test("simple assignment", async () => {
-        await expectAST("a = 1", {
+        await expectParse("a = 1", {
             __class__: AST.Assignment,
             name: "a",
             value: {
@@ -251,7 +251,7 @@ describe("parse assignment statements", () => {
         });
     });
     test("compound assignment", async () => {
-        await expectAST("a += 1", {
+        await expectParse("a += 1", {
             __class__: AST.Assignment,
             name: "a",
             value: {
@@ -271,7 +271,7 @@ describe("parse assignment statements", () => {
 });
 describe("parse call", () => {
     test("standard", async () => {
-        await expectAST("foo(1, a)", {
+        await expectParse("foo(1, a)", {
             __class__: AST.Call,
             name: "foo",
             args: [
@@ -287,7 +287,7 @@ describe("parse call", () => {
         });
     });
     test("with keyword arguments", async () => {
-        await expectAST("foo(1, 2, a: 3, b: 4)", {
+        await expectParse("foo(1, 2, a: 3, b: 4)", {
             __class__: AST.Call,
             args: [
                 {
@@ -320,7 +320,7 @@ describe("parse call", () => {
 });
 describe("parse list", () => {
     test("normal list", async () => {
-        await expectAST("[1, a]", {
+        await expectParse("[1, a]", {
             __class__: AST.List,
             values: [
                 {
@@ -339,13 +339,13 @@ describe("parse list", () => {
         await expectParseError("[1, , 2]", "empty elements not allowed in list");
     });
     test("empty list", async () => {
-        await expectAST("[]", {
+        await expectParse("[]", {
             __class__: AST.List,
             values: []
         });
     });
     test("empty list 2-deep", async () => {
-        await expectAST("[[]]", {
+        await expectParse("[[]]", {
             __class__: AST.List,
             values: [
                 {
@@ -358,7 +358,7 @@ describe("parse list", () => {
 });
 describe("parse mapping", () => {
     test("parse mapping like a list", async () => {
-        await expectAST("[1 => 2, .foo => .bar]", {
+        await expectParse("[1 => 2, .foo => .bar]", {
             __class__: AST.Mapping,
             mapping: [
                 {
@@ -389,7 +389,7 @@ describe("parse mapping", () => {
         await expectParseError("[1 => 2, 3, 4]", 'expected "=>" after key value');
     });
     test("arbitrary expressions as key & value", async () => {
-        await expectAST("[1 + a => 3 + a]", {
+        await expectParse("[1 + a => 3 + a]", {
             __class__: AST.Mapping,
             mapping: [
                 {
@@ -424,7 +424,7 @@ describe("parse mapping", () => {
 });
 describe("parse ternary operator", () => {
     test("lift 2 binary operators", async () => {
-        await expectAST("a ? b : c", {
+        await expectParse("a ? b : c", {
             __class__: AST.Conditional,
             cond: {
                 __class__: AST.Name,
@@ -447,7 +447,7 @@ describe("parse ternary operator", () => {
 });
 describe("parse definition", () => {
     test("simple definition", async () => {
-        await expectAST("foo(a, b) :- 1", {
+        await expectParse("foo(a, b) :- 1", {
             __class__: AST.Definition,
             name: "foo",
             parameters: [
@@ -469,7 +469,7 @@ describe("parse definition", () => {
 });
 describe("parse block of commas", () => {
     test("defaults at all but end get trimmed", async () => {
-        await expectAST(",1, ,2, 3,", {
+        await expectParse(",1, ,2, 3,", {
             __class__: AST.Block,
             body: [
                 {
@@ -491,7 +491,7 @@ describe("parse block of commas", () => {
         });
     });
     test("normal commas", async () => {
-        await expectAST("1, 2, 3", {
+        await expectParse("1, 2, 3", {
             __class__: AST.Block,
             body: [
                 {
@@ -512,7 +512,7 @@ describe("parse block of commas", () => {
 });
 describe("parse template and interpolation", () => {
     test("single template", async () => {
-        await expectAST("{foo(), bar()}", {
+        await expectParse("{foo(), bar()}", {
             __class__: AST.Template,
             result: {
                 __class__: AST.Block,
@@ -532,7 +532,7 @@ describe("parse template and interpolation", () => {
         });
     });
     test("template with interpolation", async () => {
-        await expectAST("{foo(), &bar}", {
+        await expectParse("{foo(), &bar}", {
             __class__: AST.Template,
             result: {
                 __class__: AST.Block,
@@ -557,7 +557,7 @@ describe("parse template and interpolation", () => {
 
 describe("pipeline placeholder", () => {
     test("parses pipe placeholder form", async () => {
-        await expectAST("bar(#, 1, #)", {
+        await expectParse("bar(#, 1, #)", {
             __class__: AST.Call,
             name: "bar",
             args: [
@@ -577,7 +577,7 @@ describe("pipeline placeholder", () => {
 });
 describe("parses and attaches attributes", () => {
     test("simple attributes on a definition", async () => {
-        await expectAST("#!preset foo(a, b) :- 1", {
+        await expectParse("#!preset foo(a, b) :- 1", {
             __class__: AST.AnnotatedValue,
             attributes: [
                 {
@@ -606,7 +606,7 @@ describe("parses and attaches attributes", () => {
         });
     });
     test("complex attribute on a definition", async () => {
-        await expectAST("#!preset('FM Sine') fmSine(a) :- 1", {
+        await expectParse("#!preset('FM Sine') fmSine(a) :- 1", {
             __class__: AST.AnnotatedValue,
             attributes: [
                 {
@@ -637,7 +637,7 @@ describe("parses and attaches attributes", () => {
         });
     });
     test("complex attribute 2", async () => {
-        await expectAST("#!preset('FM Sine', category: 'Retro') fmSine(a) :- 1", {
+        await expectParse("#!preset('FM Sine', category: 'Retro') fmSine(a) :- 1", {
             __class__: AST.AnnotatedValue,
             attributes: [
                 {
@@ -676,7 +676,7 @@ describe("parses and attaches attributes", () => {
         });
     });
     test("simple attributes as a value in context", async () => {
-        await expectAST("zz(#!pitch) + 1", {
+        await expectParse("zz(#!pitch) + 1", {
             __class__: AST.BinaryOp,
             op: "+",
             left: {
@@ -702,7 +702,7 @@ describe("parses and attaches attributes", () => {
         })
     });
     test("complex attributes as a value", async () => {
-        await expectAST("#!mod(0, 1)", {
+        await expectParse("#!mod(0, 1)", {
             __class__: AST.AnnotatedValue,
             attributes: [
                 {
@@ -724,7 +724,7 @@ describe("parses and attaches attributes", () => {
         });
     });
     test("attribute used as value if cannot annotate expression", async () => {
-        await expectAST("#!z + y", {
+        await expectParse("#!z + y", {
             __class__: AST.BinaryOp,
             op: "+",
             left: {
@@ -752,13 +752,13 @@ describe("parses and attaches attributes", () => {
 });
 describe("expand simple pipe operators", () => {
     test("dumb pipe", async () => {
-        await expectAST("a |> #", {
+        await expectParse("a |> #", {
             __class__: AST.Name,
             name: "a",
         });
     });
     test("simple pipe expansion", async () => {
-        await expectAST("foo() |> # * 2", {
+        await expectParse("foo() |> # * 2", {
             __class__: AST.BinaryOp,
             op: "*",
             left: {
@@ -773,7 +773,7 @@ describe("expand simple pipe operators", () => {
         });
     });
     test("chained pipe expansion", async () => {
-        await expectAST("foo() |> bar(#) |> baz(#)", {
+        await expectParse("foo() |> bar(#) |> baz(#)", {
             __class__: AST.Call,
             name: "baz",
             args: [
@@ -792,7 +792,7 @@ describe("expand simple pipe operators", () => {
         });
     });
     test("multiple targets for expansion", async () => {
-        await expectAST("foo() |> (# ? # : 1)", {
+        await expectParse("foo() |> (# ? # : 1)", {
             __class__: AST.Block,
             body: [
                 {
@@ -820,158 +820,6 @@ describe("expand simple pipe operators", () => {
                     }
                 }
             ]
-        });
-    });
-});
-describe("constant folding", () => {
-    test("simple math", async () => {
-        await expectAST("1 + 2 * 3", {
-            __class__: AST.Value,
-            value: 7
-        });
-    });
-    test("conditional elimination", async () => {
-        await expectAST("1 == 1 ? hello : goodbye", {
-            __class__: AST.Name,
-            name: "hello"
-        });
-    });
-    test("inner expressions folded", async () => {
-        await expectAST("[1+1, 2+2, 2^(1/12)]", {
-            __class__: AST.List,
-            values: [
-                {
-                    __class__: AST.Value,
-                    value: 2
-                },
-                {
-                    __class__: AST.Value,
-                    value: 4
-                },
-                {
-                    __class__: AST.Value,
-                    value: Math.pow(2, 1 / 12),
-                }
-            ]
-        });
-    });
-    test("folding with strings", async () => {
-        await expectAST("'Hello, ' + 'World!'", {
-            __class__: AST.Value,
-            value: "Hello, World!"
-        });
-    });
-    test("list splat constant folding", async () => {
-        await expectAST("[a, *[b, *[c], d]]", {
-            __class__: AST.List,
-            values: [
-                {
-                    __class__: AST.Name,
-                    name: "a",
-                },
-                {
-                    __class__: AST.Name,
-                    name: "b",
-                },
-                {
-                    __class__: AST.Name,
-                    name: "c",
-                },
-                {
-                    __class__: AST.Name,
-                    name: "d",
-                }
-            ]
-        });
-    });
-    test("call site constant folding", async () => {
-        await expectAST("foo(a, b, *[c, d])", {
-            __class__: AST.Call,
-            name: "foo",
-            args: [
-                {
-                    __class__: AST.Name,
-                    name: "a",
-                },
-                {
-                    __class__: AST.Name,
-                    name: "b",
-                },
-                {
-                    __class__: AST.Name,
-                    name: "c",
-                },
-                {
-                    __class__: AST.Name,
-                    name: "d",
-                }
-            ]
-        });
-    });
-    test("pipe constant folding", async () => {
-        await expectAST("100 + 245 |> (# + # + 'abc' + #)", {
-            __class__: AST.Value,
-            value: "690abc345"
-        });
-    });
-    test("length constant folding for a constant length list", async () => {
-        await expectAST("1 |> (#[foo, #bar]+#)", {
-            __class__: AST.Value,
-            value: 3
-        });
-    });
-    test("length constant folding for a constant length list with splats", async () => {
-        await expectAST("1 |> (#[foo, *[1, 2, 3]]+#)", {
-            __class__: AST.Value,
-            value: 5
-        });
-    });
-    test("no length constant folding for a list with unfoldable splats in it", async () => {
-        await expectAST("#[1, *a]", {
-            __class__: AST.UnaryOp,
-            op: "#",
-            value: {
-                __class__: AST.List,
-                values: [
-                    {
-                        __class__: AST.Value,
-                        value: 1,
-                    },
-                    {
-                        __class__: AST.SplatValue,
-                        value: {
-                            __class__: AST.Name,
-                            name: "a"
-                        }
-                    }
-                ]
-            }
-        });
-    });
-    test("folding part but not all", async () => {
-        await expectAST("#[1, *[*a, 1]]", {
-            __class__: AST.UnaryOp,
-            op: "#",
-            value: {
-                __class__: AST.List,
-                values: [
-                    {
-                        __class__: AST.Value,
-                        value: 1,
-                    },
-                    {
-                        __class__: AST.SplatValue,
-                        value: {
-                            __class__: AST.Name,
-                            name: "a"
-                        }
-                    },
-                    {
-                        __class__: AST.Value,
-                        value: 1,
-                    },
-                ]
-            }
         });
     });
 });

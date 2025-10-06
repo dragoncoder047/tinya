@@ -21,7 +21,7 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
             }
         } else {
             if (firstKW) throw new RuntimeError("positional argument can't come after keyword argument", arg.loc, [new ErrorNote("note: first keyword argument was here:", firstKW.loc), ...AST.stackToNotes(state.callstack)]);
-            if (i >= nodeImpl[1].length) throw new RuntimeError("too many arguments", arg.loc, AST.stackToNotes(state.callstack));
+            if (i >= nodeImpl[1].length) throw new RuntimeError("too many arguments to " + nodeImpl[0], arg.edgemost(true).loc, AST.stackToNotes(state.callstack));
         }
         const argEntry = nodeImpl[1][argIndex]!;
         seenArgs[argEntry[0]] = arg;
@@ -39,6 +39,7 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
             const newState: EvalState = { ...state, currentEnumChoices: enumChoices };
             value = await arg.eval(newState);
         } else {
+            // TODO: need to walk tree and replace symbols in the current arg call WITHOUT evaluating the rest of the tree
             value = arg;
         }
         newArgs[argIndex] = value;
