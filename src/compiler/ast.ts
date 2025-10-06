@@ -131,6 +131,9 @@ export namespace AST {
                 return this.values.map(v => isinstance(v, Value) ? v.value : (v as List).toImmediate());
             }
         }
+        static fromImmediate(trace: LocationTrace, m: any[]): List | Value {
+            return Array.isArray(m) ? new List(trace, m.map(r => List.fromImmediate(trace, r))) : new Value(trace, m);
+        }
     }
 
     export class Definition extends Node {
@@ -185,12 +188,11 @@ export namespace AST {
         }
         private _applied(left: Node, right: Node) {
             var fn: (typeof OPERATORS)[keyof typeof OPERATORS]["cb"] | undefined;
-            var ok = true, list = false, a, b;
+            var ok = true, a, b;
             if (isinstance(left, Value)) {
                 a = left.value;
             } else if (isinstance(left, List) && left.isImmediate()) {
                 a = left.toImmediate();
-                list = true;
             } else {
                 ok = false;
             }
@@ -198,12 +200,11 @@ export namespace AST {
                 b = right.value;
             } else if (isinstance(right, List) && right.isImmediate()) {
                 b = right.toImmediate();
-                list = true;
             } else {
                 ok = false;
             }
             if (ok && (fn = OPERATORS[this.op]?.cb)) {
-                return new (list ? List : Value)(this.loc, fn(a, b));
+                return List.fromImmediate(this.loc, fn(a, b))
             }
             return new BinaryOp(this.loc, this.op, left, right);
         }
@@ -217,23 +218,17 @@ export namespace AST {
             return this._applied(await this.value.eval(state));
         }
         private _applied(val: Node): Node {
-            // Special case length of an immediate list
-            if (isinstance(val, List) && this.op === "#" && !val.hasSplats()) {
-                // TODO: if the list has splats in it this should reduce to num_non_splats + #splats
-                return new Value(this.loc, OPERATORS["#"]!.cu!(val.values));
-            }
             var fn: (typeof OPERATORS)[keyof typeof OPERATORS]["cu"] | undefined;
-            var ok = true, list = false, value;
+            var ok = true, value;
             if (isinstance(val, Value)) {
                 value = val.value;
             } else if (isinstance(val, List) && val.isImmediate()) {
                 value = val.toImmediate();
-                list = true;
             } else {
                 ok = false;
             }
             if (ok && (fn = OPERATORS[this.op]?.cu)) {
-                return new (list ? List : Value)(this.loc, fn(value));
+                return List.fromImmediate(this.loc, fn(value));
             }
             return new UnaryOp(this.loc, this.op, val);
         }
