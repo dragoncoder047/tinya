@@ -35,6 +35,7 @@ beforeEach(() => {
             ]
         ],
         callstack: [],
+        recursionLimit: 1000,
         annotators: {
             async test(x, args, state) {
                 return x!;
@@ -370,16 +371,23 @@ describe("defining functions and macros", () => {
     });
 });
 describe("recursion", () => {
-    test("fibonacci", async () => {
-        await expectEval("fibonacci(a) :- a <= 1 ? a : fibonacci(a - 1) + fibonacci(a - 2); fibonacci(28)", dummyState, {
+    test("A000142 (factorial)", async () => {
+        await expectEval("f(a) :- a > 1 ? a * f(a - 1) : 1; f(15)", dummyState, {
+            __class__: AST.Value,
+            value: 1307674368000
+        });
+    });
+    test("A000045 (Fibonacci sequence)", async () => {
+        // Takes about 2 seconds
+        await expectEval("f(a) :- a <= 1 ? a : f(a - 1) + f(a - 2); f(28)", dummyState, {
             __class__: AST.Value,
             value: 317811
         });
     });
-    test("factorial", async () => {
-        await expectEval("factorial(a) :- a > 1 ? a * factorial(a - 1) : 1; factorial(15)", dummyState, {
+    test("A005185 (Hofstadter 'Q' sequence)", async () => {
+        await expectEval("f(a) :- a < 3 ? 1 : f(a - f(a - 1)) + f(a - f(a - 2)); f(25)", dummyState, {
             __class__: AST.Value,
-            value: 1307674368000
+            value: 14
         });
     });
     test("recursion is limited", async () => {

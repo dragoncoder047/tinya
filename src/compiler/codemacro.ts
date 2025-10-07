@@ -10,7 +10,7 @@ export function makeCodeMacroExpander(name: string, finalMacro: boolean, params:
     var built = false;
     const f = async (args: AST.Node[], state: EvalState): Promise<AST.Node> => {
         if (!built) await build(state);
-        if (state.callstack.length > 100) throw new RuntimeError("too much recursion", state.callstack.at(-1)!.loc, AST.stackToNotes(state.callstack));
+        if (state.callstack.length > state.recursionLimit) throw new RuntimeError("too much recursion", state.callstack.at(-1)!.loc, AST.stackToNotes(state.callstack));
         const givenArgs = await processArgsInCall(state, false, state.callstack.at(-1)!.loc, args, fakeNodeDef);
         const newState = { ...state, env: Object.create(state.globalEnv) };
         for (var i = 0; i < fakeNodeDef[1].length; i++) {

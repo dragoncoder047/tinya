@@ -6,6 +6,7 @@ export interface EvalState {
     functions: MacroDef[];
     nodes: NodeDef[];
     callstack: AST.Call[],
+    recursionLimit: number;
     annotators: Record<string, (
         val: AST.Node | null,
         evaledArgs: AST.Node[] | null,
