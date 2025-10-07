@@ -60,7 +60,7 @@ function toJS(ast: AST.Node): string {
     if (isinstance(ast, AST.List))
         return code(ast, list(ast.values));
     if (isinstance(ast, AST.Definition))
-        return code(ast, prim(ast.name), list(ast.parameters), toJS(ast.body));
+        return code(ast, prim(ast.name), prim(ast.outMacro), list(ast.parameters), toJS(ast.body));
     if (isinstance(ast, AST.Template))
         return code(ast, toJS(ast.result));
     if (isinstance(ast, AST.InterpolatedValue))
@@ -82,7 +82,7 @@ function toJS(ast: AST.Node): string {
     if (isinstance(ast, AST.Block))
         return code(ast, list(ast.body));
     if (isinstance(ast, AST.ParameterDescriptor))
-        return code(ast, prim(ast.name), toJS(ast.enumOptions), toJS(ast.defaultValue));
+        return code(ast, prim(ast.name), toJS(ast.enumOptions), toJS(ast.defaultValue), prim(ast.lazy));
     if (isinstance(ast, AST.Mapping))
         return code(ast, liststr(ast.mapping.map(({ key, val }) => `{ key: ${toJS(key)}, val: ${toJS(val)} }`)));
     throw "unreachable";

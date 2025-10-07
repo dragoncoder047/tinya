@@ -12,8 +12,9 @@ interface ASTSpec {
     [p: string]: Constructor<AST.Node> | string | number | ASTSpec | ASTSpec[] | undefined | null;
 }
 function checkAST(ast: any, spec: ASTSpec, path: string) {
-    const failMsg = "AST failed to match at " + path;
     for (var prop of Object.keys(spec)) {
+        const newpath = path + "." + prop
+        const failMsg = "AST failed to match at " + newpath;
         const desc = spec[prop]!;
         if (prop === "__class__") {
             expect(ast, failMsg).toBeInstanceOf(desc);
@@ -23,7 +24,7 @@ function checkAST(ast: any, spec: ASTSpec, path: string) {
                 checkAST(ast[prop][i], desc[i]!, path + "." + prop + "[" + i + "]");
             }
         } else if (typeof desc === "object" && desc !== null) {
-            checkAST(ast[prop], desc, path + "." + prop);
+            checkAST(ast[prop], desc, newpath);
         } else {
             expect(ast[prop], failMsg).toEqual(desc);
         }

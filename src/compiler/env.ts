@@ -3,7 +3,7 @@ import { AST } from "./ast";
 export interface EvalState {
     env: Record<string, AST.Node>;
     globalEnv: Record<string, AST.Node>;
-    macros: MacroDef[];
+    functions: MacroDef[];
     nodes: NodeDef[];
     callstack: AST.Call[],
     annotators: Record<string, (

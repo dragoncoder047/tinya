@@ -70,8 +70,13 @@ const TRANSFORM_PASSES = [
 
     async function expandDefinitions(ast: AST.Node, alreadyExpanded = false): Promise<AST.Node> {
         if (!isinstance(ast, AST.BinaryOp) || ast.op !== ":-") return ast.pipe(expandDefinitions);
-        const header = alreadyExpanded ? ast.left : await ast.left.pipe(expandDefinitions);
+        var header = alreadyExpanded ? ast.left : await ast.left.pipe(expandDefinitions);
         const body = alreadyExpanded ? ast.right : await ast.right.pipe(expandDefinitions);
+        var isMacro = false;
+        if (isinstance(header, AST.UnaryOp) && header.op === "@") {
+            header = header.value;
+            isMacro = true;
+        }
         if (!isinstance(header, AST.Call)) {
             if (isinstance(header, AST.AnnotatedValue) && header.value !== null) {
                 ast.left = header.value;
@@ -83,12 +88,17 @@ const TRANSFORM_PASSES = [
         var firstOptional: AST.Node | undefined;
         const realParams: AST.Node[] = [];
         for (var i = 0; i < params.length; i++) {
-            const param = params[i]!;
+            var param = params[i]!;
+            var lazy = false;
+            if (isinstance(param, AST.UnaryOp) && param.op === "@") {
+                param = param.value;
+                lazy = true;
+            }
             if (isinstance(param, AST.Name)) {
                 if (firstOptional) {
                     throw new ParseError("required parameter follows optional parameter", param.loc, [new ErrorNote("note: first optional parameter is here", firstOptional.loc)]);
                 }
-                realParams.push(param);
+                realParams.push(lazy ? new AST.ParameterDescriptor(param.loc, param.name, new AST.Mapping(param.loc, []), new AST.DefaultPlaceholder(param.loc), true) : param);
                 continue;
             }
             if (!isinstance(param, AST.BinaryOp) || (param.op !== ":" && param.op !== "=")) {
@@ -102,9 +112,6 @@ const TRANSFORM_PASSES = [
                         throw new ParseError("expected a mapping", param.right.loc);
                     }
                     enums = param.right;
-                    if (!isinstance(name, AST.Name)) {
-                        throw new ParseError("illegal parameter name for options parameter", name.edgemost(false).loc);
-                    }
                     for (var { key } of enums.mapping) {
                         if (!isinstance(key, AST.Symbol)) {
                             throw new ParseError("expected a symbol here", key.edgemost(false).loc, [new ErrorNote(`note: while defining enum options for parameter ${str(name.name)}`, name.loc), ...(isinstance(key, AST.Name) ? [new ErrorNote(`hint: put a "." before the ${str(key.name)} to make it a static symbol instead of a variable`, key.loc)] : [])]);
@@ -120,9 +127,6 @@ const TRANSFORM_PASSES = [
                         enums = name.right;
                         name = name.left;
                     }
-                    if (!isinstance(name, AST.Name)) {
-                        throw new ParseError("illegal parameter name for optional parameter", name.edgemost(false).loc);
-                    }
                     default_ = param.right;
                     break;
                 default:
@@ -133,9 +137,16 @@ const TRANSFORM_PASSES = [
             } else {
                 if (!firstOptional) firstOptional = name;
             }
-            realParams.push(new AST.ParameterDescriptor(name.loc, name.name, enums, default_));
+            if (isinstance(name, AST.UnaryOp) && name.op === "@") {
+                param = name.value;
+                lazy = true;
+            }
+            if (!isinstance(name, AST.Name)) {
+                throw new ParseError("illegal parameter name for optional parameter", name.edgemost(false).loc);
+            }
+            realParams.push(new AST.ParameterDescriptor(name.loc, name.name, enums, default_, lazy));
         }
-        return new AST.Definition(header.loc, header.name, realParams, body);
+        return new AST.Definition(header.loc, header.name, isMacro, realParams, body);
     },
 
     async function expandAssignments(ast: AST.Node): Promise<AST.Node> {

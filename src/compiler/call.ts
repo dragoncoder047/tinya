@@ -3,7 +3,7 @@ import { AST } from "./ast";
 import { EvalState, NodeDef } from "./env";
 import { RuntimeError, ErrorNote, LocationTrace } from "./errors";
 
-export async function processArgsInCall(state: EvalState, doEvalArgs: boolean | boolean[], site: LocationTrace, args: AST.Node[], nodeImpl: NodeDef) {
+export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, site: LocationTrace, args: AST.Node[], nodeImpl: NodeDef) {
     const newArgs: AST.Node[] = [];
     const seenArgs: Record<string, AST.Node> = {};
     var firstKW: AST.Node | undefined;
@@ -49,7 +49,7 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean | 
             value = new AST.Value(arg.loc, defaultValue);
         } else if (isinstance(arg, AST.SplatValue)) {
             throw new RuntimeError("splats are only valid in a list", arg.loc, AST.stackToNotes(state.callstack));
-        } else if ((doEvalArgs as any)[argIndex] ?? doEvalArgs) {
+        } else if (doEvalArgs) {
             value = await value.eval(state);
         }
         newArgs[argIndex] = value;

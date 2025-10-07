@@ -67,7 +67,8 @@ export namespace AST {
         edgemost(left: boolean): Node { return left ? this : this.value.edgemost(left); }
         async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Assignment(this.loc, this.name, await fn(this.value)); }
         async eval(state: EvalState) {
-            return (Object.hasOwn(state.globalEnv, this.name) ? state.globalEnv : state.env)[this.name] = await this.value.eval(state);
+            const scope = Object.hasOwn(state.env, this.name) ? state.env : Object.hasOwn(state.globalEnv, this.name) ? state.globalEnv : state.env;
+            return scope[this.name] = await this.value.eval(state);
         }
     }
 
@@ -87,18 +88,18 @@ export namespace AST {
         edgemost(left: boolean): Node { return left ? this : this.args.at(-1)?.edgemost(left) ?? this; }
         async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Call(this.loc, this.name, await asyncNodePipe(this.args, fn)); }
         async eval(state: EvalState) {
-            const macroImpl = state.macros.find(m => m[0] === this.name);
-            if (macroImpl) {
-                const [name, argc, impl] = macroImpl;
+            const funcImpl = state.functions.find(f => f[0] === this.name);
+            if (funcImpl) {
+                const [name, argc, impl] = funcImpl;
                 if ((argc ?? -1) >= 0 && this.args.length !== argc) {
-                    throw new RuntimeError(`wrong number of arguments to macro ${name} (expected ${argc}, got ${this.args.length})`, this.loc, stackToNotes(state.callstack));
+                    throw new RuntimeError(`wrong number of arguments to function ${name} (expected ${argc}, got ${this.args.length})`, this.loc, stackToNotes(state.callstack));
                 }
-                const newState: EvalState = { ...state, env: Object.create(state.globalEnv), callstack: state.callstack.concat(this) };
-                return (await impl(this.args, newState)).eval(state);
+                const newState: EvalState = { ...state, callstack: state.callstack.concat(this) };
+                return impl(this.args, newState);
             }
             const nodeImpl = state.nodes.find(n => n[0] === this.name);
             if (!nodeImpl) {
-                throw new RuntimeError("undefined node or macro " + this.name, this.loc, stackToNotes(state.callstack));
+                throw new RuntimeError("undefined node or function " + this.name, this.loc, stackToNotes(state.callstack));
             }
             return new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl));
         }
@@ -137,19 +138,19 @@ export namespace AST {
     }
 
     export class Definition extends Node {
-        constructor(trace: LocationTrace, public name: string, public parameters: Node[], public body: Node) { super(trace); };
+        constructor(trace: LocationTrace, public name: string, public outMacro: boolean, public parameters: Node[], public body: Node) { super(trace); };
         edgemost(left: boolean): Node { return left ? this.parameters.length > 0 ? this.parameters[0]!.edgemost(left) : this : this.body.edgemost(left); }
-        async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Definition(this.loc, this.name, await asyncNodePipe(this.parameters, fn), await fn(this.body)); }
+        async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Definition(this.loc, this.name, this.outMacro, await asyncNodePipe(this.parameters, fn), await fn(this.body)); }
         async eval(state: EvalState) {
-            state.macros.push([this.name, this.parameters.length, makeCodeMacroExpander(this.name, this.parameters, this.body)]);
+            state.functions.push([this.name, this.parameters.length, makeCodeMacroExpander(this.name, this.outMacro, this.parameters, this.body)]);
             return new Value(this.loc, undefined);
         }
     }
 
     export class ParameterDescriptor extends Node {
-        constructor(trace: LocationTrace, public name: string, public enumOptions: Mapping, public defaultValue: Node) { super(trace) }
+        constructor(trace: LocationTrace, public name: string, public enumOptions: Mapping, public defaultValue: Node, public lazy: boolean) { super(trace) }
         edgemost(left: boolean): Node { return left ? this : this.defaultValue.edgemost(left); }
-        async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new ParameterDescriptor(this.loc, this.name, await fn(this.enumOptions) as Mapping, await fn(this.defaultValue)) }
+        async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new ParameterDescriptor(this.loc, this.name, await fn(this.enumOptions) as Mapping, await fn(this.defaultValue), this.lazy) }
         async eval(state: EvalState): Promise<never> {
             throw new RuntimeError("cannot evaluate", this.loc, stackToNotes(state.callstack));
         }
@@ -188,22 +189,22 @@ export namespace AST {
         }
         private _applied(left: Node, right: Node) {
             var fn: (typeof OPERATORS)[keyof typeof OPERATORS]["cb"] | undefined;
-            var ok = true, a, b;
+            var imm = true, a, b;
             if (isinstance(left, Value)) {
                 a = left.value;
             } else if (isinstance(left, List) && left.isImmediate()) {
                 a = left.toImmediate();
             } else {
-                ok = false;
+                imm = false;
             }
             if (isinstance(right, Value)) {
                 b = right.value;
             } else if (isinstance(right, List) && right.isImmediate()) {
                 b = right.toImmediate();
             } else {
-                ok = false;
+                imm = false;
             }
-            if (ok && (fn = OPERATORS[this.op]?.cb)) {
+            if (imm && (fn = OPERATORS[this.op]?.cb)) {
                 return List.fromImmediate(this.loc, fn(a, b))
             }
             return new BinaryOp(this.loc, this.op, left, right);
@@ -219,15 +220,15 @@ export namespace AST {
         }
         private _applied(val: Node): Node {
             var fn: (typeof OPERATORS)[keyof typeof OPERATORS]["cu"] | undefined;
-            var ok = true, value;
+            var imm = true, value;
             if (isinstance(val, Value)) {
                 value = val.value;
             } else if (isinstance(val, List) && val.isImmediate()) {
                 value = val.toImmediate();
             } else {
-                ok = false;
+                imm = false;
             }
-            if (ok && (fn = OPERATORS[this.op]?.cu)) {
+            if (imm && (fn = OPERATORS[this.op]?.cu)) {
                 return List.fromImmediate(this.loc, fn(value));
             }
             return new UnaryOp(this.loc, this.op, val);
@@ -324,7 +325,7 @@ export namespace AST {
     export function stackToNotes(stack: Call[]): ErrorNote[] {
         const out: ErrorNote[] = [];
         for (var s of stack) {
-            out.push(new ErrorNote(`note: while evaluating macro ${str(s.name)}`, s.loc));
+            out.push(new ErrorNote(`note: while evaluating function ${str(s.name)}`, s.loc));
         }
         return out.reverse();
     }
