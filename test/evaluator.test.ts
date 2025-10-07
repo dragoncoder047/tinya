@@ -1,6 +1,6 @@
-import { beforeEach, describe, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { AST } from "../src/compiler/ast";
-import { EvalState, NodeValueType } from "../src/compiler/env";
+import { EvalState, NodeValueType } from "../src/compiler/evalState";
 import { LocationTrace } from "../src/compiler/errors";
 import { expectEval, expectEvalError } from "./astCheck";
 
@@ -36,11 +36,7 @@ beforeEach(() => {
         ],
         callstack: [],
         recursionLimit: 100,
-        annotators: {
-            async test(x, args, state) {
-                return x!;
-            }
-        }
+        annotators: {},
     };
     dummyState.env = Object.create(dummyState.globalEnv);
 })
@@ -354,7 +350,7 @@ describe("templates", () => {
         });
     });
 });
-describe("defining functions and macros", () => {
+describe("defining functions", () => {
     test("definitions", async () => {
         await expectEval("myFun(x, y) :- (y *= 2, y + x)", dummyState, {});
         await expectEval("myFun(100, 1000)", dummyState, {
@@ -409,4 +405,27 @@ describe("recursion", () => {
     test("recursion is limited", async () => {
         await expectEvalError("f() :- f(); f()", dummyState, "too much recursion");
     });
+});
+describe("immediate math", () => {
+    test("node with immediate math mode", async () => {
+        const m = mock((dt: number, args: any[]) => args[0] + Math.sqrt(args[1]));
+        dummyState.nodes.push(["dummy", [["x", null], ["y", null]], NodeValueType.DECOUPLED_MATH, [], () => m]);
+        await expectEval("dummy(1, 2)", dummyState, {
+            __class__: AST.Value,
+            value: 1 + Math.sqrt(2)
+        });
+        expect(m).toHaveBeenCalledWith(null, [1, 2]);
+    });
+});
+describe("annotations", () => {
+    test("annotations registered on object", async () => {
+        const m = mock(async (x: AST.Node | null) => x! && new AST.Value(x.loc, (x as any).value * 2));
+        dummyState.annotators.doubleMe = m;
+        await expectEval("#!doubleMe 2", dummyState, {
+            __class__: AST.Value,
+            value: 4
+        });
+        expect(m).toHaveBeenCalledTimes(1);
+    });
+    // TODO: more annotation checks
 });

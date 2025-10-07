@@ -35,3 +35,5 @@ export class TinyAError extends Error {
 export class ParseError extends TinyAError { }
 
 export class RuntimeError extends TinyAError { }
+
+export class CompileError extends TinyAError { }

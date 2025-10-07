@@ -1,6 +1,6 @@
 import { isinstance, str } from "../utils";
 import { AST } from "./ast";
-import { EvalState, NodeDef } from "./env";
+import { EvalState, NodeDef } from "./evalState";
 import { RuntimeError, ErrorNote, LocationTrace } from "./errors";
 
 export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, site: LocationTrace, args: AST.Node[], nodeImpl: NodeDef) {

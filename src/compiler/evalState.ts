@@ -23,6 +23,7 @@ export type MacroDef = [
 export enum NodeValueType {
     NORMAL,
     STEREO,
+    DECOUPLED_MATH
 }
 export type NodeDef = [
     name: string,

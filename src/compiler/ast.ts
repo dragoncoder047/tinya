@@ -1,7 +1,7 @@
 import { isinstance, str } from "../utils";
 import { processArgsInCall } from "./call";
 import { makeCodeMacroExpander } from "./codemacro";
-import { EvalState } from "./env";
+import { EvalState, NodeValueType } from "./evalState";
 import { ErrorNote, LocationTrace, RuntimeError } from "./errors";
 import { OPERATORS } from "./operator";
 
@@ -100,6 +100,10 @@ export namespace AST {
             const nodeImpl = state.nodes.find(n => n[0] === this.name);
             if (!nodeImpl) {
                 throw new RuntimeError("undefined node or function " + this.name, this.loc, stackToNotes(state.callstack));
+            }
+            var x: List;
+            if (nodeImpl[2] === NodeValueType.DECOUPLED_MATH && (x = new List(this.loc, this.args)).isImmediate()) {
+                return new Value(this.loc, nodeImpl[4]()(null!, x.toImmediate()!));
             }
             return new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl));
         }

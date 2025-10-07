@@ -1,7 +1,7 @@
 import { isinstance } from "../utils";
 import { AST } from "./ast";
 import { processArgsInCall } from "./call";
-import { EvalState, NodeDef, NodeValueType } from "./env";
+import { EvalState, NodeDef, NodeValueType } from "./evalState";
 import { RuntimeError } from "./errors";
 
 export function makeCodeMacroExpander(name: string, finalMacro: boolean, params: AST.Node[], body: AST.Node): ((args: AST.Node[], state: EvalState) => Promise<AST.Node>) & { body: AST.Node } {

@@ -1,4 +1,4 @@
-import { NodeDef, NodeHelp, NodeValueType } from "../compiler/env";
+import { NodeDef, NodeHelp, NodeValueType } from "../compiler/evalState";
 import { abs, noise3, noise5, saw, sgn, sin, tan, TAU, tri } from "../math";
 
 export const zzfxOscillator: NodeDef = [

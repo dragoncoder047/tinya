@@ -1,4 +1,4 @@
-import { NodeDef, NodeHelp, NodeValueType } from "../compiler/env";
+import { NodeDef, NodeHelp, NodeValueType } from "../compiler/evalState";
 import { TAU, abs, cos, sin, sgn } from "../math";
 
 

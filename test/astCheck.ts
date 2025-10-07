@@ -1,7 +1,7 @@
 import { expect } from "bun:test";
 import { parse } from "../src/compiler";
 import { AST } from "../src/compiler/ast";
-import { EvalState } from "../src/compiler/env";
+import { EvalState } from "../src/compiler/evalState";
 import { ErrorNote, ParseError, RuntimeError, TinyAError } from "../src/compiler/errors";
 
 export const F = "<test string>";
