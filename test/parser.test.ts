@@ -125,16 +125,16 @@ describe("parse expressions", () => {
         });
     });
     test("exponentiation is right associative", async () => {
-        await expectParse("2 ^ a ^ 4", {
+        await expectParse("2 ** a ** 4", {
             __class__: AST.BinaryOp,
-            op: "^",
+            op: "**",
             left: {
                 __class__: AST.Value,
                 value: 2,
             },
             right: {
                 __class__: AST.BinaryOp,
-                op: "^",
+                op: "**",
                 left: {
                     __class__: AST.Name,
                     name: "a",
@@ -147,12 +147,12 @@ describe("parse expressions", () => {
         });
     });
     test("unary minus comes after exponentiation", async () => {
-        await expectParse("-a ^ x", {
+        await expectParse("-a ** x", {
             __class__: AST.UnaryOp,
             op: "-",
             value: {
                 __class__: AST.BinaryOp,
-                op: "^",
+                op: "**",
                 left: {
                     __class__: AST.Name,
                     name: "a",
@@ -165,9 +165,9 @@ describe("parse expressions", () => {
         });
     });
     test("unary minus doesn't come after exponentiation with a number", async () => {
-        await expectParse("-1 ^ x", {
+        await expectParse("-1 ** x", {
             __class__: AST.BinaryOp,
-            op: "^",
+            op: "**",
             left: {
                 __class__: AST.Value,
                 value: -1,
@@ -195,7 +195,7 @@ describe("parse expressions", () => {
         })
     });
     test("parses matrix multiplication form with correct precedence", async () => {
-        await expectParse("a^t @ b + c", {
+        await expectParse("a**t @ b + c", {
             __class__: AST.BinaryOp,
             op: "+",
             left: {
@@ -203,7 +203,7 @@ describe("parse expressions", () => {
                 op: "@",
                 left: {
                     __class__: AST.BinaryOp,
-                    op: "^",
+                    op: "**",
                     left: {
                         __class__: AST.Name,
                         name: "a"

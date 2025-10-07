@@ -35,7 +35,7 @@ beforeEach(() => {
             ]
         ],
         callstack: [],
-        recursionLimit: 1000,
+        recursionLimit: 100,
         annotators: {
             async test(x, args, state) {
                 return x!;
@@ -120,7 +120,7 @@ describe("operations", () => {
         });
     });
     test("inner expressions evaluated", async () => {
-        await expectEval("[1+1, 2+2, 2^(1/12)]", dummyState, {
+        await expectEval("[1+1, 2+2, 2**(1/12)]", dummyState, {
             __class__: AST.List,
             values: [
                 {
@@ -378,16 +378,32 @@ describe("recursion", () => {
         });
     });
     test("A000045 (Fibonacci sequence)", async () => {
-        // Takes about 2 seconds
+        // Takes about 1.6 seconds
         await expectEval("f(a) :- a <= 1 ? a : f(a - 1) + f(a - 2); f(28)", dummyState, {
             __class__: AST.Value,
             value: 317811
         });
     });
     test("A005185 (Hofstadter 'Q' sequence)", async () => {
+        // Takes about 1.3 seconds
         await expectEval("f(a) :- a < 3 ? 1 : f(a - f(a - 1)) + f(a - f(a - 2)); f(25)", dummyState, {
             __class__: AST.Value,
             value: 14
+        });
+    });
+    test("A063510", async () => {
+        await expectEval("f(a) :- a > 1 ? f((a ** .5) | 0) + 1 : 1; f(110)", dummyState, {
+            __class__: AST.Value,
+            value: 4
+        });
+    });
+    test("list expansion", async () => {
+        await expectEval("f(a, n) :- n > 0 ? [*f(a, n - 1), *f(a, n - 1)] : [a]; f(1, 10)", dummyState, {
+            __class__: AST.List,
+            values: new Array(1024).fill({
+                __class__: AST.Value,
+                value: 1
+            }),
         });
     });
     test("recursion is limited", async () => {
