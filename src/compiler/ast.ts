@@ -165,13 +165,16 @@ export namespace AST {
         edgemost(left: boolean): Node { return this.result.edgemost(left); }
         async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Template(this.loc, await fn(this.result)); }
         async eval(state: EvalState) {
+            const replaceTrace = async (arg: Node): Promise<Node> => {
+                const val = await arg.pipe(replaceTrace);
+                val.loc = new LocationTrace(arg.loc.line, arg.loc.col, arg.loc.file, ["note: expanded from template:", this.loc]);
+                return val;
+            }
             const recur = async (arg: Node, depth: number): Promise<Node> => {
                 if (isinstance(arg, Template)) return arg.pipe(n => recur(n, depth + 1));
                 if (isinstance(arg, InterpolatedValue)) {
                     if (depth <= 1) {
-                        const val = await arg.value.eval(state);
-                        val.loc = new LocationTrace(arg.loc.line, arg.loc.col, arg.loc.file, ["note: expanded from template:", this.loc]);
-                        return val;
+                        return replaceTrace(await arg.value.eval(state));
                     } else {
                         const val = await arg.pipe(n => recur(n, depth - 1));
                         if (isinstance(val, InterpolatedValue) && isinstance(val.value, Value)) return val.value;
@@ -180,7 +183,7 @@ export namespace AST {
                 }
                 return arg.pipe(n => recur(n, depth));
             }
-            return recur(this.result, 1);
+            return recur(await replaceTrace(this.result), 1);
         }
     }
 

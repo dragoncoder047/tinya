@@ -349,6 +349,32 @@ describe("templates", () => {
             }
         });
     });
+    test("quote and expand", async () => {
+        await expectEval("quote(@code) :- code; @expand(code) :- code; foo = quote({something = a}); expand(expand(foo)); something", dummyState, {
+            __class__: AST.Value,
+            value: 1
+        });
+    });
+    test("dynamic injection", async () => {
+        await expectEval("@expand(code) :- code; f(formula, x) :- expand(formula); c = {x**2 + 2}; [f(c, 1), f({&c + 1}, 2), f(c, 3)]", dummyState, {
+            __class__: AST.List,
+            values: [
+                {
+                    __class__: AST.Value,
+                    value: 3
+                },
+                {
+                    __class__: AST.Value,
+                    value: 7
+                },
+                {
+                    __class__: AST.Value,
+                    value: 11
+                }
+            ]
+        });
+        await expectEvalError("x", dummyState, "undefined: x");
+    });
 });
 describe("defining functions", () => {
     test("definitions", async () => {
@@ -394,9 +420,10 @@ describe("recursion", () => {
         });
     });
     test("list expansion", async () => {
-        await expectEval("f(a, n) :- n > 0 ? [*f(a, n - 1), *f(a, n - 1)] : [a]; f(1, 10)", dummyState, {
+        const x = 13;
+        await expectEval(`f(a, n) :- n > 0 ? [*f(a, n - 1), *f(a, n - 1)] : [a]; f(1, ${x})`, dummyState, {
             __class__: AST.List,
-            values: new Array(1024).fill({
+            values: new Array(2 ** x).fill({
                 __class__: AST.Value,
                 value: 1
             }),
