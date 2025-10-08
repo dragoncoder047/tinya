@@ -21,7 +21,7 @@ export type MacroDef = [
 ];
 
 export enum NodeValueType {
-    NORMAL,
+    NORMAL_OR_MONO,
     STEREO,
     DECOUPLED_MATH
 }

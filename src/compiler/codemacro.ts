@@ -5,7 +5,7 @@ import { EvalState, NodeDef, NodeValueType } from "./evalState";
 import { RuntimeError } from "./errors";
 
 export function makeCodeMacroExpander(name: string, finalMacro: boolean, params: AST.Node[], body: AST.Node): ((args: AST.Node[], state: EvalState) => Promise<AST.Node>) & { body: AST.Node } {
-    const fakeNodeDef: NodeDef = [name, [], NodeValueType.NORMAL, [], null as any];
+    const fakeNodeDef: NodeDef = [name, [], NodeValueType.NORMAL_OR_MONO, [], null as any];
     const shouldEvalParam: boolean[] = [];
     var built = false;
     const f = async (args: AST.Node[], state: EvalState): Promise<AST.Node> => {

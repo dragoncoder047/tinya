@@ -5,7 +5,7 @@ import { TAU, abs, cos, sin, sgn } from "../math";
 export const zzfxFilter: NodeDef = [
     "zzfxFilter",
     [["sample", null], ["cutoff", null], ["quality", 2]],
-    NodeValueType.NORMAL,
+    NodeValueType.NORMAL_OR_MONO,
     [],
     () => {
         var x2 = 0, x1 = 0, y2 = 0, y1 = 0;
@@ -41,7 +41,7 @@ export const zzfxFilterHelp: NodeHelp = {
 export const bitcrusher: NodeDef = [
     "bitcrusher",
     [["sample", null], ["sampleRate", 8000]],
-    NodeValueType.NORMAL,
+    NodeValueType.NORMAL_OR_MONO,
     [],
     () => {
         var phase = 0, last = 0;
@@ -70,7 +70,7 @@ export const bitcrusherHelp: NodeHelp = {
 export const delay: NodeDef = [
     "delay",
     [["sample", null], ["time", 0]],
-    NodeValueType.NORMAL,
+    NodeValueType.NORMAL_OR_MONO,
     [],
     () => {
         var len = 1 << 14; // ~ 0.3 seconds of audio at 48kHz

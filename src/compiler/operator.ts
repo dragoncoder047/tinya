@@ -37,8 +37,9 @@ export const OPERATORS: Record<string, Operator> = {
     "**": op(1, INVALID, true).code((a, b) => a ** b),
     // multiply or splat operator
     "*": op(3, -Infinity).code((a, b) => a * b),
-    // divide
+    // divide & modulo
     "/": op(3).code((a, b) => a / b),
+    "%": op(3).code((a, b) => a % b),
     // matrix multiply
     // or decorator to mark param or declaration as lazy/macro
     "@": op(3, -Infinity).code(matMul as any),

@@ -29,7 +29,7 @@ beforeEach(() => {
             [
                 "foo",
                 [["bar", null], ["baz", null]],
-                NodeValueType.NORMAL,
+                NodeValueType.NORMAL_OR_MONO,
                 [, { opt1: 2, opt2: 3 }],
                 () => () => 1,
             ]
