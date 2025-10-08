@@ -105,9 +105,7 @@ type Note = [
         [shapeBar: number | undefined, shapeNoteIndex: number]
     ]);
 ];
-type NotePin = [pitch: number, expression: number];
-    // if MIDINote is 0, it means there is no pitch bend in this pin
-    // Expression is always present
+type NotePin = [pitchBend: number | undefined, expression: number | undefined];
 type ModIndex = [
     target: ModTarget,
     which: number | string,
