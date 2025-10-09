@@ -22,7 +22,7 @@ export enum Opcode {
     APPLY_NODE,
     /** next 3 is node no A and B, argc */
     APPLY_DOUBLE_NODE_STEREO,
-    /** next is input number */
+    /** next is input name, returns 0 if doesn't exist */
     GET_INPUT,
 }
 
@@ -30,16 +30,16 @@ export type Program = (Opcode | number | string)[];
 
 export interface CompileState {
     p: Program;
-    reg: string[];
+    r: string[];
     nn: string[];
     mod: string[];
-    toss: boolean;
+    tosStereo: boolean;
     ni: NodeDef[];
 }
 
-export function alloc(name: string, which: "reg" | "mod", state: CompileState): number {
-    const i = state[which].indexOf(name);
-    if (i === -1) return state[which].push(name) - 1;
+export function allocRegister(name: string, state: CompileState): number {
+    const i = state.r.indexOf(name);
+    if (i === -1) return state.r.push(name) - 1;
     return i;
 }
 export function allocNode(name: string, state: CompileState): number {

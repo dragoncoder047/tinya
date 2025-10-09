@@ -1,9 +1,11 @@
 // export const mapObject = <T, U>(obj: Record<string, T>, func: (value: T, key: string) => U): Record<string, U> =>
 //     Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, func(value, key)]));
 
-// const typeOf = (x: any) => typeof x;
-// export const is = (t: string, func: (x: any) => any = typeOf) => (x: any) => func(x) === t;
-// export const isNumber = is("number") as (x: any) => x is number;
+export const map = (n: number, x: number, y: number, a: number, b: number) => (n - x) * (b - a) / (y - x) + a;
+
+const typeOf = (x: any) => typeof x;
+export const is = (t: string, func: (x: any) => any = typeOf) => (x: any) => func(x) === t;
+export const isNumber = is("number") as (x: any) => x is number;
 // export const isUndefined = is("undefined") as (x: any) => x is undefined;
 // export const isString = is("string") as (x: any) => x is string;
 // export const isNull = (x: any): x is null => x === null;
@@ -12,7 +14,7 @@
 // type AssertedType<F> = F extends (x: any) => x is infer U ? U : never;
 // type UnionOfPredicates<T, Fns extends readonly ((x: T) => x is any)[]> = AssertedType<Fns[number]>;
 // export const any = <T, const Fns extends readonly Predicate<T, any>[]>(x: T, ...funcs: Fns): x is UnionOfPredicates<T, Fns> => funcs.some(f => f(x));
-// export const isArray = Array.isArray;
+export const isArray = Array.isArray;
 // export const isObject = is("object") as (x: any) => x is Record<string, any>;
 
 // export const isConstant = (x: any): x is null | undefined | number | string => any(x, isNull, isUndefined, isNumber) || (isString(x) && !(isRef(x) || isNodeName(x) || isInputRef(x)));
@@ -40,6 +42,6 @@ export function gensym<T extends string>(prefix: T): `${T}${number}` {
     return `${prefix}${gensymCounters[prefix]}` as const;
 }
 
-export function isinstance<C>(obj: any, cls: abstract new(...args: any[]) => C): obj is C {
+export function isinstance<C>(obj: any, cls: abstract new (...args: any[]) => C): obj is C {
     return obj instanceof cls;
 }

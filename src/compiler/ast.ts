@@ -4,7 +4,7 @@ import { makeCodeMacroExpander } from "./codemacro";
 import { CompileError, ErrorNote, LocationTrace, RuntimeError } from "./errors";
 import { EvalState, NodeValueType } from "./evalState";
 import { OPERATORS } from "./operator";
-import { alloc, allocNode, CompileState, Opcode, Program } from "./prog";
+import { allocRegister, allocNode, CompileState, Opcode, Program } from "./prog";
 
 export namespace AST {
 
@@ -63,7 +63,7 @@ export namespace AST {
         }
         compile(state: CompileState) {
             state.p.push(Opcode.PUSH_CONSTANT, this.value);
-            state.toss = false;
+            state.tosStereo = false;
         }
     }
 
@@ -84,7 +84,7 @@ export namespace AST {
         }
         compile(state: CompileState) {
             this.value.compile(state);
-            state.p.push(Opcode.TAP_REGISTER, alloc(this.name, "reg", state));
+            state.p.push(Opcode.TAP_REGISTER, allocRegister(this.name, state));
         }
     }
 
@@ -98,7 +98,7 @@ export namespace AST {
             return val;
         }
         compile(state: CompileState) {
-            state.p.push(Opcode.GET_REGISTER, alloc(this.name, "reg", state));
+            state.p.push(Opcode.GET_REGISTER, allocRegister(this.name, state));
         }
     }
 
@@ -137,7 +137,7 @@ export namespace AST {
             for (i = 0; i < this.args.length; i++) {
                 state.p = [];
                 this.args[i]!.compile(state);
-                argProgs.push([state.p, state.toss ? NodeValueType.STEREO : NodeValueType.NORMAL_OR_MONO]);
+                argProgs.push([state.p, state.tosStereo ? NodeValueType.STEREO : NodeValueType.NORMAL_OR_MONO]);
             }
             state.p = existingProg;
             const callProg: Program = [Opcode.APPLY_NODE, allocNode(this.name, state)];
@@ -147,7 +147,7 @@ export namespace AST {
             // if the node is stereo -> mono, normal with the inputs also being widened if needed
             // We assume our arguments are correct and line up positionally already
             // (this should have been handled by the eval() stage)
-            state.toss = nodeImpl[2] === NodeValueType.STEREO;
+            state.tosStereo = nodeImpl[2] === NodeValueType.STEREO;
             if (nodeImpl[1].every(a => a[2] !== NodeValueType.STEREO) && argProgs.some(s => s[1] === NodeValueType.STEREO)) {
                 // Can stereo widen
                 for (i = 0; i < nodeImpl[1].length; i++) {
@@ -156,7 +156,7 @@ export namespace AST {
                         argProgs[i]![0].push(Opcode.STEREO_DOUBLE_WIDEN);
                     }
                 }
-                state.toss = true;
+                state.tosStereo = true;
                 callProg[0] = Opcode.APPLY_DOUBLE_NODE_STEREO;
                 callProg.push(allocNode(this.name, state)); // 2nd node
             }
@@ -170,7 +170,7 @@ export namespace AST {
                         argProgs[i]![0].push(Opcode.STEREO_DOUBLE_WIDEN);
                     }
                 }
-                state.toss = nodeImpl[2] === NodeValueType.STEREO;
+                state.tosStereo = nodeImpl[2] === NodeValueType.STEREO;
             }
             for (i = 0; i < this.args.length; i++) {
                 state.p.push(...argProgs[i]![0]);
@@ -225,7 +225,7 @@ export namespace AST {
                     }
                 }
             }
-            state.toss = this.values.length === 2;
+            state.tosStereo = this.values.length === 2;
         }
     }
 
