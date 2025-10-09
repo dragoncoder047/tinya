@@ -15,13 +15,13 @@ const config: esbuild.BuildOptions = {
     format: "esm",
     target: "esnext",
     treeShaking: true,
-    outfile: opt("-o", true) ?? "build/tinya.js",
+    outfile: opt("-o", true) ?? "build/syd.js",
     plugins: [
         {
             name: "precache builtin macro code",
             setup(build) {
-                // Load ".preparsed.txt" files and return an AST as JS expression
-                build.onLoad({ filter: /\.preparsed\.txt$/ }, async args => {
+                // Load ".syd" files and return an AST as JS expression
+                build.onLoad({ filter: /\.syd$/ }, async args => {
                     const tojsScriptPath = resolve(dirname(import.meta.filename), "tojs");
                     const absSrc = resolve(dirname(import.meta.filename), "../src");
                     const fileDir = dirname(args.path);

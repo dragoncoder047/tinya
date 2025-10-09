@@ -1,5 +1,5 @@
 import { AST } from "./compiler/ast";
-declare module "*.preparsed.txt" {
+declare module "*.syd" {
     const value: AST.Node;
     export default value;
 }

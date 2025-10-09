@@ -1,10 +1,10 @@
-# TinyA
+# Syd
 
 <!-- markdownlint-disable single-h1 heading-increment no-trailing-punctuation -->
 
-TinyA is a simple, versatile, and opinionated Javascript/Typescript library for playing a wide range of 8-bit videogame style sound effects and music.
+Syd is a simple, versatile, and opinionated Javascript/Typescript library for playing a wide range of 8-bit videogame style sound effects and music.
 
-TinyA is inspired by [BeepBox][], [ZzFX][], and [ZzFXM][], and but is not related to any of those, isn't entirely compatible, and is most certainly larger than ZzFXM (you wouldn't want to use TinyA in a js13k game even though it is small. It's not *that* small compared to ZzFXM.)
+Syd is inspired by [BeepBox][], [ZzFX][], and [ZzFXM][], and but is not related to any of those, isn't compatible, and is most certainly larger than ZzFXM (you wouldn't want to use Syd in a js13k game even though it is small. It's not *that* small compared to ZzFXM.)
 
 [ZzFX]: https://github.com/KilledByAPixel/ZzFX
 [ZzFXM]: https://github.com/keithclark/ZzFXM
@@ -12,7 +12,7 @@ TinyA is inspired by [BeepBox][], [ZzFX][], and [ZzFXM][], and but is not relate
 
 ## General topology
 
-To be able to create the maximum variety of sound effects, TinyA implements a highly configurable audio pipeline, which can create many different sound effects.
+To be able to create the maximum variety of sound effects, Syd implements a highly configurable audio pipeline, which can create many different sound effects.
 
 ## Notation of Graph
 
@@ -30,7 +30,7 @@ so I joined the [beepbox modding discord server](https://discord.com/invite/Tc99
 
 (I typed this up as though I was going to implement it and then didn't. Oops! Here's to more free time...)
 
-As TinyA is intended to create not only sound effects, but music, there are special invalid  values placed at the beginning that will tell TinyA that the input channel timing array means something else.
+As Syd is intended to create not only sound effects, but music, there are special invalid  values placed at the beginning that will tell Syd that the input channel timing array means something else.
 
 1. If the first element of the channel array is undefined and the rest are positive or undefined, this means the channel array is a tempo-based array. Instead of seconds for the time value and any other arbitrary value for the value, the time becomes beats and the output value becomes BPM, and the beats time value is relative to the current BPM. The "output" of this channel is then the beat count.
 
@@ -101,7 +101,7 @@ TODO: the envelope channel header conflicts with the negative duration BPM thing
 
 * Make the "compressed JSON" parser able to parse fractions like 1/16 so people can more easily hand-write stuff without having to break out a calculator (also `.0625` is a tad longer than `1/16` and gets worse as the fraction gets smaller). Maybe also have the stringifier detect likely fractions and do this too. [Relevant StackOverflow question](https://stackoverflow.com/questions/26643695/converting-a-floating-point-decimal-value-to-a-fraction)
 
-* Make TinyA capable of streaming output (being able to play some sound before all samples are generated). Need to figure out how to reify buildSamples' internal state.
+* Make Syd capable of streaming output (being able to play some sound before all samples are generated). Need to figure out how to reify buildSamples' internal state.
 
 * Be able to specify more than one channel value in the same array. This would be conducive to, say, encoding an entire track of a song (note pitch, articulation, dynamics, "muting" a horn, etc.) with the values at the same timestep right next to each other in the array, and the lengths are re-used, so stuff stays in sync.
     * This would mean that the single channel outputs an array, so the input reference needs to specify which index (possibly using the first number)
@@ -118,5 +118,5 @@ TODO: the envelope channel header conflicts with the negative duration BPM thing
     * Have a node that can tell the length
     * This would simplify the BeepBox arpeggiation if the pitch channel output can output an array
 
-* :smiley: :smiley: :smiley: Make [a BeepBox fork](https://github.com/dragoncoder047/dragonbox) that uses TinyA as a backend and lets people edit the instrument graph visually, and then export to some compressed-JSON string that can be sent to a dedicated renderer
+* :smiley: :smiley: :smiley: Make [a BeepBox fork](https://github.com/dragoncoder047/dragonbox) that uses Syd as a backend and lets people edit the instrument graph visually, and then export to some compressed-JSON string that can be sent to a dedicated renderer
     * DragonBox is not there yet.

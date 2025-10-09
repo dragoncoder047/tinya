@@ -2,7 +2,7 @@ import { expect } from "bun:test";
 import { parse } from "../src/compiler";
 import { AST } from "../src/compiler/ast";
 import { EvalState } from "../src/compiler/evalState";
-import { ErrorNote, ParseError, RuntimeError, TinyAError } from "../src/compiler/errors";
+import { ErrorNote, ParseError, RuntimeError, SydError } from "../src/compiler/errors";
 
 export const F = "<test string>";
 
@@ -34,7 +34,7 @@ export async function expectParse(p: string, spec: ASTSpec) {
     try {
         checkAST(await parse(p, F), spec, "");
     } catch (e) {
-        if (e instanceof TinyAError) {
+        if (e instanceof SydError) {
             expect.unreachable(e.displayOn({ [F]: p }) + e.stack);
         }
         else throw e;
@@ -58,7 +58,7 @@ export async function expectEval(p: string, state: EvalState, spec: ASTSpec) {
     try {
         checkAST(await parse(p, F).then(e => e.eval(state)), spec, "");
     } catch (e) {
-        if (e instanceof TinyAError) {
+        if (e instanceof SydError) {
             expect.unreachable(e.displayOn({ [F]: p }) + e.stack);
         }
         else throw e;

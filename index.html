@@ -2,7 +2,7 @@
 <html>
 
     <head>
-        <title>TinyA test</title>
+        <title>Syd test</title>
         <style>
             textarea {
                 font-family: "Fira Code", monospace;
@@ -18,57 +18,14 @@
     </head>
 
     <body>
-        <h1>TinyA test</h1>
-        <p><a href="https://github.com/dragoncoder047/tinya?tab=readme-ov-file">(What is this?)</a></p>
+        <h1>Syd test</h1>
+        <p><a href="https://github.com/dragoncoder047/syd?tab=readme-ov-file">(What is this?)</a></p>
         <p><button id="play">Play</button></p>
         <p>Instrument: <textarea id="instrument" rows="2" cols="100">BROKEN RN SORRY</textarea></p>
         <canvas id="oscilloscope" width="800" height="200"></canvas>
         <pre id="log"></pre>
         <script type="module">
-            import * as tinya from "./build/tinya.js";
-
-            const playBtn = document.getElementById("play");
-            const instrumentArea = document.getElementById("instrument");
-            const channelsArea = document.getElementById("channels");
-            const log = document.getElementById("log");
-            const canvas = document.getElementById("oscilloscope");
-            const canvasCtx = canvas.getContext("2d");
-            const audioCtx = new AudioContext;
-            var player;
-
-            const channelMacros = {
-                a: tinya.makeADSRChannel
-            };
-
-            playBtn.addEventListener("click", () => {
-                audioCtx.resume();
-                log.textContent = "";
-                try {
-                    const instrumentValue = tinya.minparse(instrumentArea.value);
-                    const channelsValue = tinya.minparse(channelsArea.value);
-                    const instrumentExpanded = tinya.macroexpand(instrumentValue, tinya.builtinMacros);
-                    console.log("expanded instrument:", instrumentExpanded);
-                    const instrument = tinya.compileInstrument(instrumentExpanded, tinya.builtinNodes);
-                    console.log("compiled instrument:", instrument);
-                    log.textContent = tinya.debugDumpInstrument(instrument, tinya.builtinNodes);
-                    console.log("channels value:", channelsValue);
-                    const channels = tinya.macroexpand(channelsValue, channelMacros);
-                    console.log("expanded channels:", channels);
-                    const durations = Object.values(channels).map(c => tinya.channelDuration(c));
-                    const duration = Math.max(...durations);
-                    const samples = tinya.buildSamples(instrument, channels, duration);
-                    drawSamples(samples, canvas, canvasCtx);
-                    const bufferNode = tinya.toBufferNode(samples, audioCtx);
-                    log.style.color = "black";
-                    bufferNode.connect(audioCtx.destination);
-                    player?.stop();
-                    (player = bufferNode).start();
-                } catch (e) {
-                    log.textContent += e.stack ?? e.message ?? e;
-                    log.style.color = "red";
-                    throw e;
-                }
-            });
+            import * as syd from "./build/syd.js";
 
             function drawSamples(samples, canvas, ctx) {
                 const ratio = window.devicePixelRatio || 1;
