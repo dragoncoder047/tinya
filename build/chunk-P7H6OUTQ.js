@@ -307,27 +307,27 @@ var sources = {
   ],
   "test.syd": [
     'print("bleeble");',
-    '#!include "../index.syd"'
+    ""
   ]
 };
 var _str0print = "print";
 var _str1bleeble = "bleeble";
 var _str2testsyd = "test.syd";
-var _str3indexsyd = "index.syd";
-var _str4while = "while";
-var _str5cond = "cond";
-var _str6controlsyd = "control.syd";
-var _str7body = "body";
-var _str8for = "for";
-var _str9var = "var";
-var _str10min = "min";
-var _str11max = "max";
-var _str12step = "step";
-var _str13 = "<";
-var _str14 = "+";
-var _str15quote = "quote";
-var _str16code = "code";
-var _str17expand = "expand";
+var _str3while = "while";
+var _str4cond = "cond";
+var _str5controlsyd = "control.syd";
+var _str6body = "body";
+var _str7for = "for";
+var _str8var = "var";
+var _str9min = "min";
+var _str10max = "max";
+var _str11step = "step";
+var _str12 = "<";
+var _str13 = "+";
+var _str14quote = "quote";
+var _str15code = "code";
+var _str16expand = "expand";
+var _str17indexsyd = "index.syd";
 var _test0 = new Block(
   new LocationTrace(0, 0, _str2testsyd),
   [
@@ -340,86 +340,77 @@ var _test0 = new Block(
           _str1bleeble
         )
       ]
-    ),
-    _index2
+    )
   ]
 );
 var _effects1 = _test0;
-var _index2 = new Block(
-  new LocationTrace(0, 2, _str3indexsyd),
-  [
-    _control4,
-    _functions3,
-    _effects1
-  ]
-);
-var _functions3 = _test0;
-var _control4 = new Block(
-  new LocationTrace(3, 0, _str6controlsyd),
+var _functions2 = _test0;
+var _control3 = new Block(
+  new LocationTrace(3, 0, _str5controlsyd),
   [
     new Definition(
-      new LocationTrace(3, 1, _str6controlsyd),
-      _str4while,
+      new LocationTrace(3, 1, _str5controlsyd),
+      _str3while,
       true,
       [
         new ParameterDescriptor(
-          new LocationTrace(3, 8, _str6controlsyd),
-          _str5cond,
+          new LocationTrace(3, 8, _str5controlsyd),
+          _str4cond,
           new Mapping(
-            new LocationTrace(3, 8, _str6controlsyd),
+            new LocationTrace(3, 8, _str5controlsyd),
             []
           ),
-          new DefaultPlaceholder(new LocationTrace(3, 8, _str6controlsyd)),
+          new DefaultPlaceholder(new LocationTrace(3, 8, _str5controlsyd)),
           true
         ),
         new ParameterDescriptor(
-          new LocationTrace(3, 15, _str6controlsyd),
-          _str7body,
+          new LocationTrace(3, 15, _str5controlsyd),
+          _str6body,
           new Mapping(
-            new LocationTrace(3, 15, _str6controlsyd),
+            new LocationTrace(3, 15, _str5controlsyd),
             []
           ),
-          new DefaultPlaceholder(new LocationTrace(3, 15, _str6controlsyd)),
+          new DefaultPlaceholder(new LocationTrace(3, 15, _str5controlsyd)),
           true
         )
       ],
       new Template(
-        new LocationTrace(3, 24, _str6controlsyd),
+        new LocationTrace(3, 24, _str5controlsyd),
         new Conditional(
-          new LocationTrace(5, 8, _str6controlsyd),
+          new LocationTrace(5, 8, _str5controlsyd),
           new InterpolatedValue(
-            new LocationTrace(4, 4, _str6controlsyd),
+            new LocationTrace(4, 4, _str5controlsyd),
             new Name(
-              new LocationTrace(4, 5, _str6controlsyd),
-              _str5cond
+              new LocationTrace(4, 5, _str5controlsyd),
+              _str4cond
             )
           ),
           new Block(
-            new LocationTrace(5, 12, _str6controlsyd),
+            new LocationTrace(5, 12, _str5controlsyd),
             [
               new InterpolatedValue(
-                new LocationTrace(5, 11, _str6controlsyd),
+                new LocationTrace(5, 11, _str5controlsyd),
                 new Name(
-                  new LocationTrace(5, 12, _str6controlsyd),
-                  _str7body
+                  new LocationTrace(5, 12, _str5controlsyd),
+                  _str6body
                 )
               ),
               new Call(
-                new LocationTrace(6, 12, _str6controlsyd),
-                _str4while,
+                new LocationTrace(6, 12, _str5controlsyd),
+                _str3while,
                 [
                   new InterpolatedValue(
-                    new LocationTrace(6, 18, _str6controlsyd),
+                    new LocationTrace(6, 18, _str5controlsyd),
                     new Name(
-                      new LocationTrace(6, 19, _str6controlsyd),
-                      _str5cond
+                      new LocationTrace(6, 19, _str5controlsyd),
+                      _str4cond
                     )
                   ),
                   new InterpolatedValue(
-                    new LocationTrace(6, 25, _str6controlsyd),
+                    new LocationTrace(6, 25, _str5controlsyd),
                     new Name(
-                      new LocationTrace(6, 26, _str6controlsyd),
-                      _str7body
+                      new LocationTrace(6, 26, _str5controlsyd),
+                      _str6body
                     )
                   )
                 ]
@@ -427,137 +418,137 @@ var _control4 = new Block(
             ]
           ),
           new Value(
-            new LocationTrace(7, 10, _str6controlsyd),
+            new LocationTrace(7, 10, _str5controlsyd),
             0
           )
         )
       )
     ),
     new Definition(
-      new LocationTrace(14, 1, _str6controlsyd),
-      _str8for,
+      new LocationTrace(14, 1, _str5controlsyd),
+      _str7for,
       true,
       [
         new ParameterDescriptor(
-          new LocationTrace(14, 6, _str6controlsyd),
-          _str9var,
+          new LocationTrace(14, 6, _str5controlsyd),
+          _str8var,
           new Mapping(
-            new LocationTrace(14, 6, _str6controlsyd),
+            new LocationTrace(14, 6, _str5controlsyd),
             []
           ),
-          new DefaultPlaceholder(new LocationTrace(14, 6, _str6controlsyd)),
+          new DefaultPlaceholder(new LocationTrace(14, 6, _str5controlsyd)),
           true
         ),
         new Name(
-          new LocationTrace(14, 11, _str6controlsyd),
-          _str10min
+          new LocationTrace(14, 11, _str5controlsyd),
+          _str9min
         ),
         new Name(
-          new LocationTrace(14, 16, _str6controlsyd),
-          _str11max
+          new LocationTrace(14, 16, _str5controlsyd),
+          _str10max
         ),
         new ParameterDescriptor(
-          new LocationTrace(14, 22, _str6controlsyd),
-          _str7body,
+          new LocationTrace(14, 22, _str5controlsyd),
+          _str6body,
           new Mapping(
-            new LocationTrace(14, 22, _str6controlsyd),
+            new LocationTrace(14, 22, _str5controlsyd),
             []
           ),
-          new DefaultPlaceholder(new LocationTrace(14, 22, _str6controlsyd)),
+          new DefaultPlaceholder(new LocationTrace(14, 22, _str5controlsyd)),
           true
         ),
         new ParameterDescriptor(
-          new LocationTrace(14, 28, _str6controlsyd),
-          _str12step,
+          new LocationTrace(14, 28, _str5controlsyd),
+          _str11step,
           new Mapping(
-            new LocationTrace(14, 32, _str6controlsyd),
+            new LocationTrace(14, 32, _str5controlsyd),
             []
           ),
           new Value(
-            new LocationTrace(14, 33, _str6controlsyd),
+            new LocationTrace(14, 33, _str5controlsyd),
             1
           ),
           false
         )
       ],
       new Template(
-        new LocationTrace(14, 39, _str6controlsyd),
+        new LocationTrace(14, 39, _str5controlsyd),
         new Block(
-          new LocationTrace(15, 5, _str6controlsyd),
+          new LocationTrace(15, 5, _str5controlsyd),
           [
             new Assignment(
-              new LocationTrace(15, 4, _str6controlsyd),
+              new LocationTrace(15, 4, _str5controlsyd),
               new InterpolatedValue(
-                new LocationTrace(15, 4, _str6controlsyd),
+                new LocationTrace(15, 4, _str5controlsyd),
                 new Name(
-                  new LocationTrace(15, 5, _str6controlsyd),
-                  _str9var
+                  new LocationTrace(15, 5, _str5controlsyd),
+                  _str8var
                 )
               ),
               new InterpolatedValue(
-                new LocationTrace(15, 11, _str6controlsyd),
+                new LocationTrace(15, 11, _str5controlsyd),
                 new Name(
-                  new LocationTrace(15, 12, _str6controlsyd),
-                  _str10min
+                  new LocationTrace(15, 12, _str5controlsyd),
+                  _str9min
                 )
               )
             ),
             new Call(
-              new LocationTrace(16, 4, _str6controlsyd),
-              _str4while,
+              new LocationTrace(16, 4, _str5controlsyd),
+              _str3while,
               [
                 new BinaryOp(
-                  new LocationTrace(16, 15, _str6controlsyd),
-                  _str13,
+                  new LocationTrace(16, 15, _str5controlsyd),
+                  _str12,
                   new InterpolatedValue(
-                    new LocationTrace(16, 10, _str6controlsyd),
+                    new LocationTrace(16, 10, _str5controlsyd),
                     new Name(
-                      new LocationTrace(16, 11, _str6controlsyd),
-                      _str9var
+                      new LocationTrace(16, 11, _str5controlsyd),
+                      _str8var
                     )
                   ),
                   new InterpolatedValue(
-                    new LocationTrace(16, 17, _str6controlsyd),
+                    new LocationTrace(16, 17, _str5controlsyd),
                     new Name(
-                      new LocationTrace(16, 18, _str6controlsyd),
-                      _str11max
+                      new LocationTrace(16, 18, _str5controlsyd),
+                      _str10max
                     )
                   )
                 ),
                 new Block(
-                  new LocationTrace(17, 9, _str6controlsyd),
+                  new LocationTrace(17, 9, _str5controlsyd),
                   [
                     new InterpolatedValue(
-                      new LocationTrace(17, 8, _str6controlsyd),
+                      new LocationTrace(17, 8, _str5controlsyd),
                       new Name(
-                        new LocationTrace(17, 9, _str6controlsyd),
-                        _str7body
+                        new LocationTrace(17, 9, _str5controlsyd),
+                        _str6body
                       )
                     ),
                     new Assignment(
-                      new LocationTrace(18, 8, _str6controlsyd),
+                      new LocationTrace(18, 8, _str5controlsyd),
                       new InterpolatedValue(
-                        new LocationTrace(18, 8, _str6controlsyd),
+                        new LocationTrace(18, 8, _str5controlsyd),
                         new Name(
-                          new LocationTrace(18, 9, _str6controlsyd),
-                          _str9var
+                          new LocationTrace(18, 9, _str5controlsyd),
+                          _str8var
                         )
                       ),
                       new BinaryOp(
-                        new LocationTrace(18, 13, _str6controlsyd),
-                        _str14,
+                        new LocationTrace(18, 13, _str5controlsyd),
+                        _str13,
                         new InterpolatedValue(
-                          new LocationTrace(18, 8, _str6controlsyd),
+                          new LocationTrace(18, 8, _str5controlsyd),
                           new Name(
-                            new LocationTrace(18, 9, _str6controlsyd),
-                            _str9var
+                            new LocationTrace(18, 9, _str5controlsyd),
+                            _str8var
                           )
                         ),
                         new InterpolatedValue(
-                          new LocationTrace(18, 16, _str6controlsyd),
+                          new LocationTrace(18, 16, _str5controlsyd),
                           new Name(
-                            new LocationTrace(18, 17, _str6controlsyd),
-                            _str12step
+                            new LocationTrace(18, 17, _str5controlsyd),
+                            _str11step
                           )
                         )
                       )
@@ -571,44 +562,52 @@ var _control4 = new Block(
       )
     ),
     new Definition(
-      new LocationTrace(23, 0, _str6controlsyd),
-      _str15quote,
+      new LocationTrace(23, 0, _str5controlsyd),
+      _str14quote,
       false,
       [
         new ParameterDescriptor(
-          new LocationTrace(23, 7, _str6controlsyd),
-          _str16code,
+          new LocationTrace(23, 7, _str5controlsyd),
+          _str15code,
           new Mapping(
-            new LocationTrace(23, 7, _str6controlsyd),
+            new LocationTrace(23, 7, _str5controlsyd),
             []
           ),
-          new DefaultPlaceholder(new LocationTrace(23, 7, _str6controlsyd)),
+          new DefaultPlaceholder(new LocationTrace(23, 7, _str5controlsyd)),
           true
         )
       ],
       new Name(
-        new LocationTrace(23, 16, _str6controlsyd),
-        _str16code
+        new LocationTrace(23, 16, _str5controlsyd),
+        _str15code
       )
     ),
     new Definition(
-      new LocationTrace(26, 1, _str6controlsyd),
-      _str17expand,
+      new LocationTrace(26, 1, _str5controlsyd),
+      _str16expand,
       true,
       [
         new Name(
-          new LocationTrace(26, 8, _str6controlsyd),
-          _str16code
+          new LocationTrace(26, 8, _str5controlsyd),
+          _str15code
         )
       ],
       new Name(
-        new LocationTrace(26, 17, _str6controlsyd),
-        _str16code
+        new LocationTrace(26, 17, _str5controlsyd),
+        _str15code
       )
     )
   ]
 );
-var ast = _control4;
+var _index4 = new Block(
+  new LocationTrace(0, 2, _str17indexsyd),
+  [
+    _control3,
+    _functions2,
+    _effects1
+  ]
+);
+var ast = _index4;
 
 // src/lib/index.ts
 function nodes() {
@@ -690,4 +689,4 @@ export {
   MessageCode,
   initWorklet
 };
-//# sourceMappingURL=chunk-7SNEV5JR.js.map
+//# sourceMappingURL=chunk-P7H6OUTQ.js.map

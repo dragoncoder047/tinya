@@ -46,7 +46,8 @@ var IncludePlaceholder = class extends Leaf {
 async function include(entrypoint, outSourceFileMap) {
   const fileToDepsPlaceholderMap = /* @__PURE__ */ new Map();
   const filenameToNodeMap = {};
-  const toCheck = [new IncludePlaceholder(LocationTrace.nowhere, null, resolve(entrypoint))];
+  const entryPlaceholder = new IncludePlaceholder(LocationTrace.nowhere, null, resolve(entrypoint));
+  const toCheck = [entryPlaceholder];
   while (toCheck.length > 0) {
     const cur = toCheck.shift();
     if (fileToDepsPlaceholderMap.has(cur.filename)) continue;
@@ -65,7 +66,7 @@ async function include(entrypoint, outSourceFileMap) {
       throw new ParseError("no such file " + str(curFile), curIP.loc, errTrace);
     }
     if (sm1.some((t) => t.filename === curFile)) {
-      throw new ParseError("circular #!include", curIP.loc, errTrace);
+      throw new ParseError(errTrace.length > 1 ? "circular #!include" : "file #!include's itself", stack[0].loc, errTrace.slice(0, -1));
     }
     const had = orderSet.delete(curFile);
     orderSet.add(curFile);
@@ -74,7 +75,7 @@ async function include(entrypoint, outSourceFileMap) {
       recurse(dep2.filename, [dep2, ...stack]);
     }
   }, "recurse");
-  recurse(entrypoint, []);
+  recurse(entrypoint, [entryPlaceholder]);
   const orderFiles = [...orderSet].reverse();
   const varnameToNodeMap = {};
   const filenameToVarnameMap = {};

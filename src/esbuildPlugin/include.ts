@@ -17,7 +17,8 @@ export async function include(entrypoint: string, outSourceFileMap: Record<strin
     // first recursively check all of the files and find their dependencies
     const fileToDepsPlaceholderMap = new Map<string, [IncludePlaceholder, IncludePlaceholder[]]>();
     const filenameToNodeMap: Record<string, AST.Node> = {};
-    const toCheck = [new IncludePlaceholder(LocationTrace.nowhere, null, resolve(entrypoint))];
+    const entryPlaceholder = new IncludePlaceholder(LocationTrace.nowhere, null, resolve(entrypoint));
+    const toCheck = [entryPlaceholder];
     while (toCheck.length > 0) {
         const cur = toCheck.shift()!;
         if (fileToDepsPlaceholderMap.has(cur.filename)) continue;
@@ -39,7 +40,7 @@ export async function include(entrypoint: string, outSourceFileMap: Record<strin
         }
         // check if circular deps
         if (sm1.some(t => t.filename === curFile)) {
-            throw new ParseError("circular #!include", curIP.loc, errTrace);
+            throw new ParseError(errTrace.length > 1 ? "circular #!include" : "file #!include's itself", stack[0]!.loc, errTrace.slice(0, -1));
         }
         // move to front
         const had = orderSet.delete(curFile);
@@ -50,7 +51,7 @@ export async function include(entrypoint: string, outSourceFileMap: Record<strin
             recurse(dep.filename, [dep, ...stack]);
         }
     }
-    recurse(entrypoint, []);
+    recurse(entrypoint, [entryPlaceholder]);
     const orderFiles = [...orderSet].reverse();
     const varnameToNodeMap: Record<string, AST.Node> = {};
     const filenameToVarnameMap: Record<string, string> = {};
