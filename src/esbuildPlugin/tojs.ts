@@ -4,7 +4,7 @@ import { parse } from "../compiler";
 import * as AST from "../compiler/ast";
 import { LocationTrace, ParseError } from "../compiler/errors";
 import { isinstance, str } from "../utils";
-import { IncludePlaceholder, processIncludes } from "./include";
+import { IncludePlaceholder, include } from "./include";
 
 const internedStrings = new Map<string, string>();
 var internStringCounter = 0;
@@ -88,15 +88,18 @@ function toJS(ast: AST.Node): string {
     if (isinstance(ast, AST.Mapping))
         return code("Mapping", ast, liststr(ast.mapping.map(({ key, val }) => `{ key: ${toJS(key)}, val: ${toJS(val)} }`)));
     if (isinstance(ast, IncludePlaceholder))
-        return ast.varname;
-    throw "unreachable";
+        return ast.varname!;
+    throw "unreachable! " + ast;
 }
 
-export async function toJSFile(filename: string): Promise<string> {
-    var includeOrder: string[], modules: Record<string, AST.Node>;
+export async function toJSFile(filename: string): Promise<{ src: string, watchFiles: string[] }> {
+    var order: string[], map: Record<string, AST.Node>, watchFiles: string[];
     const files: Record<string, string> = {};
     try {
-        [includeOrder, modules] = await processIncludes(filename, files);
+        const res = await include(filename, files);
+        order = res.order;
+        map = res.map;
+        watchFiles = res.watchFiles;
     } catch (e) {
         if (!isinstance(e, ParseError)) throw e;
         console.error(e.displayOn(files));
@@ -106,8 +109,9 @@ export async function toJSFile(filename: string): Promise<string> {
     internedStrings.clear();
     neededNames.clear();
     neededNames.add("LocationTrace");
-    const js = includeOrder.map(m => `const ${m} = ${toJS(modules[m]!)}`).join("\n\n");
-    return `import { ${[...neededNames.values()].join(", ")} } from "syd";
+    const js = order.map(m => `const ${m} = ${toJS(map[m]!)}`).join("\n\n");
+    return {
+        src: `import { ${[...neededNames.values()].join(", ")} } from "syd";
 
 export const sources = /* @__PURE__ */ {
     ${Object.entries(files).map(([name, source]) => str(name) + ":\n" + indent(str(source.split("\n"), null, 4))).join(",\n    ")}
@@ -117,8 +121,9 @@ ${getInternedStrings()}
 
 ${js}
 
-export const ast = ${includeOrder.at(-1)};
+export const ast = ${order.at(-1)};
 
 export default ast;
-`;
+`, watchFiles
+    };
 }

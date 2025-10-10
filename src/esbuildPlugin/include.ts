@@ -6,20 +6,72 @@ import { ErrorNote, LocationTrace, ParseError } from "../compiler/errors";
 import { isinstance, str } from "../utils";
 
 export class IncludePlaceholder extends AST.Leaf {
-    constructor(loc: LocationTrace, public varname: string) { super(loc); }
+    exists = true;
+    constructor(loc: LocationTrace, public varname: string | null, public filename: string) { super(loc); }
 }
-export async function processIncludes(entrypoint: string, outSourceFileMap: Record<string, string>): Promise<[string[], Record<string, AST.Node>]> {
-    const includeOrder: string[] = [];
-    const includeCounter = { value: 0 };
-    const filemap = {};
-    const cache = new Map<string, string>();
-    await doInclude(entrypoint, filemap, outSourceFileMap, includeCounter, includeOrder, cache, []);
-    return [includeOrder, filemap];
+export async function include(entrypoint: string, outSourceFileMap: Record<string, string>): Promise<{
+    order: string[],
+    watchFiles: string[],
+    map: Record<string, AST.Node>
+}> {
+    // first recursively check all of the files and find their dependencies
+    const fileToDepsPlaceholderMap = new Map<string, [IncludePlaceholder, IncludePlaceholder[]]>();
+    const filenameToNodeMap: Record<string, AST.Node> = {};
+    const toCheck = [new IncludePlaceholder(LocationTrace.nowhere, null, resolve(entrypoint))];
+    while (toCheck.length > 0) {
+        const cur = toCheck.shift()!;
+        if (fileToDepsPlaceholderMap.has(cur.filename)) continue;
+        const deps = await getFile(cur, outSourceFileMap, filenameToNodeMap);
+        fileToDepsPlaceholderMap.set(cur.filename, [cur, deps]);
+        for (var dep of deps) {
+            toCheck.push(dep);
+        }
+    }
+    // Dumb Toposort / checking for circular includes and stuff
+    const orderSet = new Set<string>();
+    const recurse = (curFile: string, stack: IncludePlaceholder[]) => {
+        const [curIP, deps] = fileToDepsPlaceholderMap.get(curFile)!;
+        const sm1 = stack.slice(1);
+        const errTrace = sm1.map(t => new ErrorNote("note: included from here:", t.loc));
+        // check if file exists
+        if (!curIP.exists) {
+            throw new ParseError("no such file " + str(curFile), curIP.loc, errTrace);
+        }
+        // check if circular deps
+        if (sm1.some(t => t.filename === curFile)) {
+            throw new ParseError("circular #!include", curIP.loc, errTrace);
+        }
+        // move to front
+        const had = orderSet.delete(curFile);
+        orderSet.add(curFile);
+        if (had) return;
+        // recurse on dependencies
+        for (var dep of deps) {
+            recurse(dep.filename, [dep, ...stack]);
+        }
+    }
+    recurse(entrypoint, []);
+    const orderFiles = [...orderSet].reverse();
+    const varnameToNodeMap: Record<string, AST.Node> = {};
+    const filenameToVarnameMap: Record<string, string> = {};
+    for (var i = 0; i < orderFiles.length; i++) {
+        const [p] = fileToDepsPlaceholderMap.get(orderFiles[i]!)!;
+        varnameToNodeMap[filenameToVarnameMap[p.filename] = p.varname = "_" + basename(p.filename).toLowerCase().replace(/\.syd$/, "").replace(/\W/g, "") + i] = filenameToNodeMap[p.filename]!;
+    }
+    // copy to others
+    for (var [_, [s, ds]] of fileToDepsPlaceholderMap.entries()) {
+        s.varname = filenameToVarnameMap[s.filename]!;
+        for (var d of ds) {
+            d.varname = filenameToVarnameMap[d.filename]!;
+        }
+    }
+    return {
+        order: orderFiles.map(f => filenameToVarnameMap[f]!), map: varnameToNodeMap,
+        watchFiles: Object.keys(filenameToNodeMap),
+    };
 }
-var spaces = 0, indent = () => "|  ".repeat(spaces).trimEnd();
-async function doInclude(curFile: string, filemap: Record<string, AST.Node>, sourceMap: Record<string, string>, includeCounter: { value: number }, includeOrder: string[], cache: Map<string, string>, includeStack: [string, AST.Value][]) {
-    const filename = curFile;
-    var currentFileNameVar = "_" + basename(filename).replace(/\W/g, "").toLowerCase() + includeCounter.value++;
+async function getFile(where: IncludePlaceholder, sourceMap: Record<string, string>, nodeMap: Record<string, AST.Node>): Promise<IncludePlaceholder[]> {
+    const deps: IncludePlaceholder[] = [];
     const walk = async (ast: AST.Node): Promise<AST.Node> => {
         if (
             !isinstance(ast, AST.AnnotatedValue) ||
@@ -29,39 +81,21 @@ async function doInclude(curFile: string, filemap: Record<string, AST.Node>, sou
             !isinstance(ast.attributes[0], AST.Name) ||
             ast.attributes[0]!.name !== "include"
         ) return ast.pipe(walk);
-        console.log(indent(), "from", filename, "got include for", ast.value.value);
-        const f = resolve(dirname(filename), ast.value.value);
-        if (includeStack.some(v => v[0] === f)) {
-            throw new ParseError("circular #!include", ast.value.loc, includeStack.map(v => new ErrorNote("note: included from here:", v[1].loc)));
+        const p = new IncludePlaceholder(ast.value.loc, null, resolve(dirname(where.filename), ast.value.value));
+        deps.push(p);
+        return p;
+    }
+    try {
+        nodeMap[where.filename] = await walk(await parseFile(where.filename, sourceMap));
+    } catch (e: any) {
+        if (e.code === "ENOENT") {
+            where.exists = false;
         }
-        try {
-            const theVarname = await doInclude(f, filemap, sourceMap, includeCounter, includeOrder, cache, [[f, ast.value], ...includeStack]);
-            console.log(indent(), "finished include of", ast.value.value);
-            return new IncludePlaceholder(ast.loc, theVarname);
-        } catch (e: any) {
-            if (e.code === "ENOENT") {
-                throw new ParseError("no such file " + str(f), ast.value.loc, includeStack.map(v => new ErrorNote("note: included from here:", v[1].loc)));
-            }
+        else {
             throw e;
         }
     }
-    spaces++;
-    if (!cache.has(filename)) {
-        console.log(indent(), "including", filename, "as", currentFileNameVar);
-        filemap[currentFileNameVar] = await walk(await parseFile(filename, sourceMap));
-        if (cache.has(filename)) throw new Error("something is wrong...", );
-        cache.set(filename, currentFileNameVar);
-        console.log(indent(), "finished including", filename, cache);
-    } else {
-        currentFileNameVar = cache.get(filename)!;
-        console.log(indent(), "using cached version for", currentFileNameVar);
-    }
-    spaces--;
-    if (includeOrder.includes(currentFileNameVar)) {
-        includeOrder.splice(includeOrder.indexOf(currentFileNameVar), 1);
-    }
-    includeOrder.unshift(currentFileNameVar);
-    return currentFileNameVar;
+    return deps;
 }
 
 async function parseFile(filename: string, filemap: Record<string, string>): Promise<AST.Node> {

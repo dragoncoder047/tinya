@@ -1,4 +1,5 @@
 import type { PluginBuild } from "esbuild";
+import { basename, dirname } from "node:path";
 import { toJSFile } from "./tojs";
 
 export function sydPlugin() {
@@ -7,8 +8,10 @@ export function sydPlugin() {
         setup(build: PluginBuild) {
             // Load ".syd" files and return an AST as JS expression
             build.onLoad({ filter: /\.syd$/ }, async args => {
+                const { src, watchFiles } = await toJSFile(args.path);
                 return {
-                    contents: await toJSFile(args.path),
+                    contents: src,
+                    watchFiles,
                     loader: "js",
                 }
             });
