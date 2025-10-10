@@ -1,5 +1,5 @@
 import { isinstance } from "../utils";
-import { AST } from "./ast";
+import * as AST from "./ast";
 
 export function isPipe(a: AST.Node): a is AST.BinaryOp {
     return isinstance(a, AST.BinaryOp) && a.op === "|>";

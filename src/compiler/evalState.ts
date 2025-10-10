@@ -1,5 +1,5 @@
 import { Synth } from "../runtime/synth";
-import { AST } from "./ast";
+import * as AST from "./ast";
 
 export interface EvalState {
     env: Record<string, AST.Node>;

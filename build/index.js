@@ -1,3 +1,396 @@
-import{a as c,b as f,c as x,d as h,e as V}from"./chunk-UPE2MW7Z.js";import{a as n,b as v}from"./chunk-WOW7UPIY.js";import{a as d,p as e,r as N,s as b,t as y,u as D}from"./chunk-P5FSJCFO.js";var _=["// basic control flow stuff","","/** while - repeats body while cond is true */","@while(@cond, @body) :- {","    &cond","        ? (&body, while(&cond, &body))","        : 0","};","","/**"," * for - repeats body with var running through min-max"," * (equivalent to `for (var = min; var < max; var += step) {body}` in JS)"," */","@for(@var, min, max, @body, step=1) :- {","    &var = &min;","    while(&var < &max, (","        &body;","        &var += &step","    ))","};","","/** quotes the expression and does NOT evaluate it - returns the AST node verbatim */","quote(@code) :- code;","","/** forces the code to be expanded in the caller's local scope */","@expand(code) :- code;",""].join(`
-`),l="while",i="cond",w="data.syd",a="body",g="for",r="var",s="min",p="max",m="step",P="<",I="+",M="quote",t="code",C="expand",A=new n.Block(new e(3,0,w),[new n.Definition(new e(3,1,w),l,!0,[new n.ParameterDescriptor(new e(3,8,w),i,new n.Mapping(new e(3,8,w),[]),new n.DefaultPlaceholder(new e(3,8,w)),!0),new n.ParameterDescriptor(new e(3,15,w),a,new n.Mapping(new e(3,15,w),[]),new n.DefaultPlaceholder(new e(3,15,w)),!0)],new n.Template(new e(3,24,w),new n.Conditional(new e(5,8,w),new n.InterpolatedValue(new e(4,4,w),new n.Name(new e(4,5,w),i)),new n.Block(new e(5,12,w),[new n.InterpolatedValue(new e(5,11,w),new n.Name(new e(5,12,w),a)),new n.Call(new e(5,18,w),l,[new n.InterpolatedValue(new e(5,24,w),new n.Name(new e(5,25,w),i)),new n.InterpolatedValue(new e(5,31,w),new n.Name(new e(5,32,w),a))])]),new n.Value(new e(6,10,w),0)))),new n.Definition(new e(13,1,w),g,!0,[new n.ParameterDescriptor(new e(13,6,w),r,new n.Mapping(new e(13,6,w),[]),new n.DefaultPlaceholder(new e(13,6,w)),!0),new n.Name(new e(13,11,w),s),new n.Name(new e(13,16,w),p),new n.ParameterDescriptor(new e(13,22,w),a,new n.Mapping(new e(13,22,w),[]),new n.DefaultPlaceholder(new e(13,22,w)),!0),new n.ParameterDescriptor(new e(13,28,w),m,new n.Mapping(new e(13,32,w),[]),new n.Value(new e(13,33,w),1),!1)],new n.Template(new e(13,39,w),new n.Block(new e(14,5,w),[new n.Assignment(new e(14,4,w),new n.InterpolatedValue(new e(14,4,w),new n.Name(new e(14,5,w),r)),new n.InterpolatedValue(new e(14,11,w),new n.Name(new e(14,12,w),s))),new n.Call(new e(15,4,w),l,[new n.BinaryOp(new e(15,15,w),P,new n.InterpolatedValue(new e(15,10,w),new n.Name(new e(15,11,w),r)),new n.InterpolatedValue(new e(15,17,w),new n.Name(new e(15,18,w),p))),new n.Block(new e(16,9,w),[new n.InterpolatedValue(new e(16,8,w),new n.Name(new e(16,9,w),a)),new n.Assignment(new e(17,8,w),new n.InterpolatedValue(new e(17,8,w),new n.Name(new e(17,9,w),r)),new n.BinaryOp(new e(17,13,w),I,new n.InterpolatedValue(new e(17,8,w),new n.Name(new e(17,9,w),r)),new n.InterpolatedValue(new e(17,16,w),new n.Name(new e(17,17,w),m))))])])]))),new n.Definition(new e(22,0,w),M,!1,[new n.ParameterDescriptor(new e(22,7,w),t,new n.Mapping(new e(22,7,w),[]),new n.DefaultPlaceholder(new e(22,7,w)),!0)],new n.Name(new e(22,16,w),t)),new n.Definition(new e(25,1,w),C,!0,[new n.Name(new e(25,8,w),t)],new n.Name(new e(25,17,w),t)),new n.DefaultPlaceholder(new e(25,21,w))]);function k(u,o){o===void 0&&(o=new URL("./sydWorklet.js",import.meta.url)),u.audioWorklet.addModule(o)}d(k,"initWorklet");export{n as AST,D as CompileError,e as LocationTrace,V as MessageCode,b as ParseError,y as RuntimeError,N as SydError,x as baseCompileState,f as baseEnv,k as initWorklet,A as lib,_ as libSrc,h as nodeHelp,c as nodes,v as parse};
+import {
+  MessageCode,
+  baseCompileState,
+  baseEnv,
+  nodeHelp,
+  nodes
+} from "./chunk-P55TU4U3.js";
+import {
+  AnnotatedValue,
+  Assignment,
+  BinaryOp,
+  Block,
+  Call,
+  Conditional,
+  DefaultPlaceholder,
+  Definition,
+  InterpolatedValue,
+  KeywordArgument,
+  Leaf,
+  List,
+  Mapping,
+  Name,
+  Node,
+  NotCodeNode,
+  ParameterDescriptor,
+  PipePlaceholder,
+  SplatValue,
+  Symbol,
+  Template,
+  UnaryOp,
+  Value,
+  ast_exports,
+  parse,
+  stackToNotes
+} from "./chunk-G32GKSBF.js";
+import {
+  CompileError,
+  ErrorNote,
+  LocationTrace,
+  ParseError,
+  RuntimeError,
+  SydError,
+  __name
+} from "./chunk-PAJYDYBO.js";
+
+// src/lib/data.syd
+var source = /* @__PURE__ */ [
+  "// basic control flow stuff",
+  "",
+  "/** while - repeats body while cond is true */",
+  "@while(@cond, @body) :- {",
+  "    &cond",
+  "        ? (&body, while(&cond, &body))",
+  "        : 0",
+  "};",
+  "",
+  "/**",
+  " * for - repeats body with var running through min-max",
+  " * (equivalent to `for (var = min; var < max; var += step) {body}` in JS)",
+  " */",
+  "@for(@var, min, max, @body, step=1) :- {",
+  "    &var = &min;",
+  "    while(&var < &max, (",
+  "        &body;",
+  "        &var += &step",
+  "    ))",
+  "};",
+  "",
+  "/** quotes the expression and does NOT evaluate it - returns the AST node verbatim */",
+  "quote(@code) :- code;",
+  "",
+  "/** forces the code to be expanded in the caller's local scope */",
+  "@expand(code) :- code;",
+  ""
+].join("\n");
+var _str0while = "while";
+var _str1cond = "cond";
+var _str2datasyd = "data.syd";
+var _str3body = "body";
+var _str4for = "for";
+var _str5var = "var";
+var _str6min = "min";
+var _str7max = "max";
+var _str8step = "step";
+var _str9 = "<";
+var _str10 = "+";
+var _str11quote = "quote";
+var _str12code = "code";
+var _str13expand = "expand";
+var ast = new Block(
+  new LocationTrace(3, 0, _str2datasyd),
+  [
+    new Definition(
+      new LocationTrace(3, 1, _str2datasyd),
+      _str0while,
+      true,
+      [
+        new ParameterDescriptor(
+          new LocationTrace(3, 8, _str2datasyd),
+          _str1cond,
+          new Mapping(
+            new LocationTrace(3, 8, _str2datasyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(3, 8, _str2datasyd)),
+          true
+        ),
+        new ParameterDescriptor(
+          new LocationTrace(3, 15, _str2datasyd),
+          _str3body,
+          new Mapping(
+            new LocationTrace(3, 15, _str2datasyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(3, 15, _str2datasyd)),
+          true
+        )
+      ],
+      new Template(
+        new LocationTrace(3, 24, _str2datasyd),
+        new Conditional(
+          new LocationTrace(5, 8, _str2datasyd),
+          new InterpolatedValue(
+            new LocationTrace(4, 4, _str2datasyd),
+            new Name(
+              new LocationTrace(4, 5, _str2datasyd),
+              _str1cond
+            )
+          ),
+          new Block(
+            new LocationTrace(5, 12, _str2datasyd),
+            [
+              new InterpolatedValue(
+                new LocationTrace(5, 11, _str2datasyd),
+                new Name(
+                  new LocationTrace(5, 12, _str2datasyd),
+                  _str3body
+                )
+              ),
+              new Call(
+                new LocationTrace(5, 18, _str2datasyd),
+                _str0while,
+                [
+                  new InterpolatedValue(
+                    new LocationTrace(5, 24, _str2datasyd),
+                    new Name(
+                      new LocationTrace(5, 25, _str2datasyd),
+                      _str1cond
+                    )
+                  ),
+                  new InterpolatedValue(
+                    new LocationTrace(5, 31, _str2datasyd),
+                    new Name(
+                      new LocationTrace(5, 32, _str2datasyd),
+                      _str3body
+                    )
+                  )
+                ]
+              )
+            ]
+          ),
+          new Value(
+            new LocationTrace(6, 10, _str2datasyd),
+            0
+          )
+        )
+      )
+    ),
+    new Definition(
+      new LocationTrace(13, 1, _str2datasyd),
+      _str4for,
+      true,
+      [
+        new ParameterDescriptor(
+          new LocationTrace(13, 6, _str2datasyd),
+          _str5var,
+          new Mapping(
+            new LocationTrace(13, 6, _str2datasyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(13, 6, _str2datasyd)),
+          true
+        ),
+        new Name(
+          new LocationTrace(13, 11, _str2datasyd),
+          _str6min
+        ),
+        new Name(
+          new LocationTrace(13, 16, _str2datasyd),
+          _str7max
+        ),
+        new ParameterDescriptor(
+          new LocationTrace(13, 22, _str2datasyd),
+          _str3body,
+          new Mapping(
+            new LocationTrace(13, 22, _str2datasyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(13, 22, _str2datasyd)),
+          true
+        ),
+        new ParameterDescriptor(
+          new LocationTrace(13, 28, _str2datasyd),
+          _str8step,
+          new Mapping(
+            new LocationTrace(13, 32, _str2datasyd),
+            []
+          ),
+          new Value(
+            new LocationTrace(13, 33, _str2datasyd),
+            1
+          ),
+          false
+        )
+      ],
+      new Template(
+        new LocationTrace(13, 39, _str2datasyd),
+        new Block(
+          new LocationTrace(14, 5, _str2datasyd),
+          [
+            new Assignment(
+              new LocationTrace(14, 4, _str2datasyd),
+              new InterpolatedValue(
+                new LocationTrace(14, 4, _str2datasyd),
+                new Name(
+                  new LocationTrace(14, 5, _str2datasyd),
+                  _str5var
+                )
+              ),
+              new InterpolatedValue(
+                new LocationTrace(14, 11, _str2datasyd),
+                new Name(
+                  new LocationTrace(14, 12, _str2datasyd),
+                  _str6min
+                )
+              )
+            ),
+            new Call(
+              new LocationTrace(15, 4, _str2datasyd),
+              _str0while,
+              [
+                new BinaryOp(
+                  new LocationTrace(15, 15, _str2datasyd),
+                  _str9,
+                  new InterpolatedValue(
+                    new LocationTrace(15, 10, _str2datasyd),
+                    new Name(
+                      new LocationTrace(15, 11, _str2datasyd),
+                      _str5var
+                    )
+                  ),
+                  new InterpolatedValue(
+                    new LocationTrace(15, 17, _str2datasyd),
+                    new Name(
+                      new LocationTrace(15, 18, _str2datasyd),
+                      _str7max
+                    )
+                  )
+                ),
+                new Block(
+                  new LocationTrace(16, 9, _str2datasyd),
+                  [
+                    new InterpolatedValue(
+                      new LocationTrace(16, 8, _str2datasyd),
+                      new Name(
+                        new LocationTrace(16, 9, _str2datasyd),
+                        _str3body
+                      )
+                    ),
+                    new Assignment(
+                      new LocationTrace(17, 8, _str2datasyd),
+                      new InterpolatedValue(
+                        new LocationTrace(17, 8, _str2datasyd),
+                        new Name(
+                          new LocationTrace(17, 9, _str2datasyd),
+                          _str5var
+                        )
+                      ),
+                      new BinaryOp(
+                        new LocationTrace(17, 13, _str2datasyd),
+                        _str10,
+                        new InterpolatedValue(
+                          new LocationTrace(17, 8, _str2datasyd),
+                          new Name(
+                            new LocationTrace(17, 9, _str2datasyd),
+                            _str5var
+                          )
+                        ),
+                        new InterpolatedValue(
+                          new LocationTrace(17, 16, _str2datasyd),
+                          new Name(
+                            new LocationTrace(17, 17, _str2datasyd),
+                            _str8step
+                          )
+                        )
+                      )
+                    )
+                  ]
+                )
+              ]
+            )
+          ]
+        )
+      )
+    ),
+    new Definition(
+      new LocationTrace(22, 0, _str2datasyd),
+      _str11quote,
+      false,
+      [
+        new ParameterDescriptor(
+          new LocationTrace(22, 7, _str2datasyd),
+          _str12code,
+          new Mapping(
+            new LocationTrace(22, 7, _str2datasyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(22, 7, _str2datasyd)),
+          true
+        )
+      ],
+      new Name(
+        new LocationTrace(22, 16, _str2datasyd),
+        _str12code
+      )
+    ),
+    new Definition(
+      new LocationTrace(25, 1, _str2datasyd),
+      _str13expand,
+      true,
+      [
+        new Name(
+          new LocationTrace(25, 8, _str2datasyd),
+          _str12code
+        )
+      ],
+      new Name(
+        new LocationTrace(25, 17, _str2datasyd),
+        _str12code
+      )
+    ),
+    new DefaultPlaceholder(new LocationTrace(25, 21, _str2datasyd))
+  ]
+);
+
+// src/index.ts
+function initWorklet(context, pathToWorkletScript) {
+  if (pathToWorkletScript === void 0) {
+    pathToWorkletScript = new URL("./sydWorklet.js", import.meta.url);
+  }
+  context.audioWorklet.addModule(pathToWorkletScript);
+}
+__name(initWorklet, "initWorklet");
+export {
+  ast_exports as AST,
+  AnnotatedValue,
+  Assignment,
+  BinaryOp,
+  Block,
+  Call,
+  CompileError,
+  Conditional,
+  DefaultPlaceholder,
+  Definition,
+  ErrorNote,
+  InterpolatedValue,
+  KeywordArgument,
+  Leaf,
+  List,
+  LocationTrace,
+  Mapping,
+  MessageCode,
+  Name,
+  Node,
+  NotCodeNode,
+  ParameterDescriptor,
+  ParseError,
+  PipePlaceholder,
+  RuntimeError,
+  SplatValue,
+  SydError,
+  Symbol,
+  Template,
+  UnaryOp,
+  Value,
+  baseCompileState,
+  baseEnv,
+  initWorklet,
+  ast as lib,
+  source as libSrc,
+  nodeHelp,
+  nodes,
+  parse,
+  stackToNotes
+};
 //# sourceMappingURL=index.js.map

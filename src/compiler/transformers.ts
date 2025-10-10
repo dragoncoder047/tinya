@@ -1,5 +1,5 @@
 import { isinstance, str } from "../utils";
-import { AST } from "./ast";
+import * as AST from "./ast";
 import { liftCommas } from "./core";
 import { ErrorNote, ParseError } from "./errors";
 import { countPlaceholdersIn, isPipe, replacePlaceholdersWith } from "./pipe";

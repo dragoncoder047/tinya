@@ -1,5 +1,5 @@
 import { isinstance, str } from "../utils";
-import { AST } from "./ast";
+import * as AST from "./ast";
 import { EvalState, NodeDef } from "./evalState";
 import { RuntimeError, ErrorNote, LocationTrace } from "./errors";
 

@@ -1,5 +1,5 @@
 import { isinstance, str } from "../utils";
-import { AST } from "./ast";
+import * as AST from "./ast";
 import { ErrorNote, ParseError } from "./errors";
 import { treeifyExpression } from "./expression";
 import { Token, TokenType } from "./tokenizer";

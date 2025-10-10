@@ -1,19 +1,168 @@
-import{a as e,b as S}from"../chunk-WOW7UPIY.js";import{a as u,n as m,o as r,s as y}from"../chunk-P5FSJCFO.js";import{basename as L}from"node:path";import{readFileSync as b}from"node:fs";var c=new Map,$=0;function A(n){return c.has(n)||c.set(n,"_str"+$+++n.toLowerCase().replaceAll(/[^\w]/g,"")),c.get(n)}u(A,"internString");function V(){return`const ${d([...c].map(([n,t])=>`
-${t} = ${m(n)}`).join(", "))};`}u(V,"getInternedStrings");function d(n){return n?n.split(`
-`).map(t=>"    "+t).join(`
-`):""}u(d,"indent");function i(n,t,...f){return`new AST.${n}(${h(t.loc)}${f.length>0?`,
-`:""}${d(f.join(`,
-`))})`}u(i,"code");function h(n){return`new LocationTrace(${n.line}, ${n.col}, ${A(n.file)})`}u(h,"location");function P(n){return`[${n.length>0?`
-`:""}${d(n.join(`,
-`))}]`}u(P,"liststr");function p(n){return P(n.map(o))}u(p,"list");function l(n){return typeof n=="string"?A(n):m(n)}u(l,"prim");function o(n){if(r(n,e.AnnotatedValue))return n.value?i("AnnotatedValue",n,p(n.attributes),o(n.value)):i("AnnotatedValue",n,p(n.attributes));if(r(n,e.Value))return i("Value",n,l(n.value));if(r(n,e.Symbol))return i("Symbol",n,l(n.value));if(r(n,e.Name))return i("Name",n,l(n.name));if(r(n,e.Assignment))return i("Assignment",n,o(n.target),o(n.value));if(r(n,e.Call))return i("Call",n,l(n.name),p(n.args));if(r(n,e.List))return i("List",n,p(n.values));if(r(n,e.Definition))return i("Definition",n,l(n.name),l(n.outMacro),p(n.parameters),o(n.body));if(r(n,e.Template))return i("Template",n,o(n.result));if(r(n,e.InterpolatedValue))return i("InterpolatedValue",n,o(n.value));if(r(n,e.SplatValue))return i("SplatValue",n,o(n.value));if(r(n,e.PipePlaceholder))return i("PipePlaceholder",n);if(r(n,e.BinaryOp))return i("BinaryOp",n,l(n.op),o(n.left),o(n.right),...n.assign?[l(n.noLift),h(n.assign)]:[]);if(r(n,e.UnaryOp))return i("UnaryOp",n,l(n.op),o(n.value));if(r(n,e.Conditional))return i("Conditional",n,o(n.cond),o(n.caseTrue),o(n.caseFalse));if(r(n,e.DefaultPlaceholder))return i("DefaultPlaceholder",n);if(r(n,e.KeywordArgument))return i("KeywordArgument",n,l(n.name),o(n.arg));if(r(n,e.Block))return i("Block",n,p(n.body));if(r(n,e.ParameterDescriptor))return i("ParameterDescriptor",n,l(n.name),o(n.enumOptions),o(n.defaultValue),l(n.lazy));if(r(n,e.Mapping))return i("Mapping",n,P(n.mapping.map(({key:t,val:f})=>`{ key: ${o(t)}, val: ${o(f)} }`)));throw"unreachable"}u(o,"toJS");async function T(n,t){let f=b(n,"utf8"),v={[t]:f};var a;try{a=await S(f,t)}catch(g){if(!r(g,y))throw g;process.stderr.write(g.displayOn(v)),process.exit(1)}$=0,c.clear();let w=o(a);return`import { AST, LocationTrace } from "syd";
+import {
+  AnnotatedValue,
+  Assignment,
+  BinaryOp,
+  Block,
+  Call,
+  Conditional,
+  DefaultPlaceholder,
+  Definition,
+  InterpolatedValue,
+  KeywordArgument,
+  List,
+  Mapping,
+  Name,
+  ParameterDescriptor,
+  PipePlaceholder,
+  SplatValue,
+  Symbol,
+  Template,
+  UnaryOp,
+  Value,
+  parse
+} from "../chunk-G32GKSBF.js";
+import {
+  ParseError,
+  __name,
+  isinstance,
+  str
+} from "../chunk-PAJYDYBO.js";
 
-export const source = /* @__PURE__ */ ${m(f.split(`
-`),null,4)}.join("\\n");
+// src/esbuildPlugin/index.ts
+import { basename } from "node:path";
 
-${V()}
+// src/esbuildPlugin/tojs.ts
+import { readFileSync } from "node:fs";
+var internedStrings = /* @__PURE__ */ new Map();
+var internStringCounter = 0;
+function internString(s) {
+  if (!internedStrings.has(s)) {
+    internedStrings.set(s, "_str" + internStringCounter++ + s.toLowerCase().replaceAll(/[^\w]/g, ""));
+  }
+  return internedStrings.get(s);
+}
+__name(internString, "internString");
+function getInternedStrings() {
+  return `const ${indent([...internedStrings].map(([val, name]) => `
+${name} = ${str(val)}`).join(", "))};`;
+}
+__name(getInternedStrings, "getInternedStrings");
+function indent(string) {
+  return string ? string.split("\n").map((l) => "    " + l).join("\n") : "";
+}
+__name(indent, "indent");
+var neededNames = /* @__PURE__ */ new Set();
+function code(name, o, ...args) {
+  neededNames.add(name);
+  return `new ${name}(${location(o.loc)}${args.length > 0 ? ",\n" : ""}${indent(args.join(",\n"))})`;
+}
+__name(code, "code");
+function location(t) {
+  return `new LocationTrace(${t.line}, ${t.col}, ${internString(t.file)})`;
+}
+__name(location, "location");
+function liststr(args) {
+  return `[${args.length > 0 ? "\n" : ""}${indent(args.join(",\n"))}]`;
+}
+__name(liststr, "liststr");
+function list(args) {
+  return liststr(args.map(toJS));
+}
+__name(list, "list");
+function prim(arg) {
+  if (typeof arg === "string") return internString(arg);
+  return str(arg);
+}
+__name(prim, "prim");
+function toJS(ast) {
+  if (isinstance(ast, AnnotatedValue))
+    return ast.value ? code("AnnotatedValue", ast, list(ast.attributes), toJS(ast.value)) : code("AnnotatedValue", ast, list(ast.attributes));
+  if (isinstance(ast, Value))
+    return code("Value", ast, prim(ast.value));
+  if (isinstance(ast, Symbol))
+    return code("Symbol", ast, prim(ast.value));
+  if (isinstance(ast, Name))
+    return code("Name", ast, prim(ast.name));
+  if (isinstance(ast, Assignment))
+    return code("Assignment", ast, toJS(ast.target), toJS(ast.value));
+  if (isinstance(ast, Call))
+    return code("Call", ast, prim(ast.name), list(ast.args));
+  if (isinstance(ast, List))
+    return code("List", ast, list(ast.values));
+  if (isinstance(ast, Definition))
+    return code("Definition", ast, prim(ast.name), prim(ast.outMacro), list(ast.parameters), toJS(ast.body));
+  if (isinstance(ast, Template))
+    return code("Template", ast, toJS(ast.result));
+  if (isinstance(ast, InterpolatedValue))
+    return code("InterpolatedValue", ast, toJS(ast.value));
+  if (isinstance(ast, SplatValue))
+    return code("SplatValue", ast, toJS(ast.value));
+  if (isinstance(ast, PipePlaceholder))
+    return code("PipePlaceholder", ast);
+  if (isinstance(ast, BinaryOp))
+    return code("BinaryOp", ast, prim(ast.op), toJS(ast.left), toJS(ast.right), ...ast.assign ? [prim(ast.noLift), location(ast.assign)] : []);
+  if (isinstance(ast, UnaryOp))
+    return code("UnaryOp", ast, prim(ast.op), toJS(ast.value));
+  if (isinstance(ast, Conditional))
+    return code("Conditional", ast, toJS(ast.cond), toJS(ast.caseTrue), toJS(ast.caseFalse));
+  if (isinstance(ast, DefaultPlaceholder))
+    return code("DefaultPlaceholder", ast);
+  if (isinstance(ast, KeywordArgument))
+    return code("KeywordArgument", ast, prim(ast.name), toJS(ast.arg));
+  if (isinstance(ast, Block))
+    return code("Block", ast, list(ast.body));
+  if (isinstance(ast, ParameterDescriptor))
+    return code("ParameterDescriptor", ast, prim(ast.name), toJS(ast.enumOptions), toJS(ast.defaultValue), prim(ast.lazy));
+  if (isinstance(ast, Mapping))
+    return code("Mapping", ast, liststr(ast.mapping.map(({ key, val }) => `{ key: ${toJS(key)}, val: ${toJS(val)} }`)));
+  throw "unreachable";
+}
+__name(toJS, "toJS");
+async function toJSFile(filename, displayFilename) {
+  const input = readFileSync(filename, "utf8");
+  const files = { [displayFilename]: input };
+  var ast;
+  try {
+    ast = await parse(input, displayFilename);
+  } catch (e) {
+    if (!isinstance(e, ParseError)) throw e;
+    console.error(e.displayOn(files));
+    throw e;
+  }
+  internStringCounter = 0;
+  internedStrings.clear();
+  neededNames.clear();
+  const js = toJS(ast);
+  neededNames.add("LocationTrace");
+  return `import { ${[...neededNames.values()].join(", ")} } from "syd";
 
-export const ast = ${w};
+export const source = /* @__PURE__ */ ${str(input.split("\n"), null, 4)}.join("\\n");
+
+${getInternedStrings()}
+
+export const ast = ${js};
 
 export default ast;
-`}u(T,"toJSFile");function F(){return{name:"syd",setup(n){n.onLoad({filter:/\.syd$/},async t=>({contents:await T(t.path,L(t.path)),loader:"js"}))}}}u(F,"sydPlugin");export{F as sydPlugin};
+`;
+}
+__name(toJSFile, "toJSFile");
+
+// src/esbuildPlugin/index.ts
+function sydPlugin() {
+  return {
+    name: "syd",
+    setup(build) {
+      build.onLoad({ filter: /\.syd$/ }, async (args) => {
+        return {
+          contents: await toJSFile(args.path, basename(args.path)),
+          loader: "js"
+        };
+      });
+    }
+  };
+}
+__name(sydPlugin, "sydPlugin");
+export {
+  sydPlugin
+};
 //# sourceMappingURL=index.js.map

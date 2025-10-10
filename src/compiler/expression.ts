@@ -1,5 +1,5 @@
 import { isinstance } from "../utils";
-import { AST } from "./ast";
+import * as AST from "./ast";
 import { LocationTrace, ParseError } from "./errors";
 import { getPrecedenceAndCheckValidity, isRightAssociative } from "./operator";
 import { Token, TokenType } from "./tokenizer";

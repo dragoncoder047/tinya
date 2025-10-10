@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { parse } from "../compiler";
-import { AST } from "../compiler/ast";
+import * as AST from "../compiler/ast";
 import { LocationTrace, ParseError } from "../compiler/errors";
 import { isinstance, str } from "../utils";
 
@@ -22,8 +21,10 @@ function indent(string: string): string {
     return string ? string.split("\n").map(l => "    " + l).join("\n") : "";
 }
 
+const neededNames = new Set<string>();
 function code(name: string, o: AST.Node, ...args: string[]): string {
-    return `new AST.${name}(${location(o.loc)}${args.length > 0 ? ",\n" : ""}${indent(args.join(",\n"))})`;
+    neededNames.add(name);
+    return `new ${name}(${location(o.loc)}${args.length > 0 ? ",\n" : ""}${indent(args.join(",\n"))})`;
 }
 
 function location(t: LocationTrace): string {
@@ -96,13 +97,15 @@ export async function toJSFile(filename: string, displayFilename: string): Promi
         ast = await parse(input, displayFilename);
     } catch (e) {
         if (!isinstance(e, ParseError)) throw e;
-        process.stderr.write(e.displayOn(files));
-        process.exit(1);
+        console.error(e.displayOn(files));
+        throw e;
     }
     internStringCounter = 0;
     internedStrings.clear();
+    neededNames.clear();
     const js = toJS(ast);
-    return `import { AST, LocationTrace } from "syd";
+    neededNames.add("LocationTrace");
+    return `import { ${[...neededNames.values()].join(", ")} } from "syd";
 
 export const source = /* @__PURE__ */ ${str(input.split("\n"), null, 4)}.join("\\n");
 
