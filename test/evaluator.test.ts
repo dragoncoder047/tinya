@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { AST } from "../src/compiler/ast";
+import * as AST from "../src/compiler/ast";
 import { LocationTrace } from "../src/compiler/errors";
 import { EvalState, NodeValueType } from "../src/compiler/evalState";
 import { expectEval, expectEvalError } from "./astCheck";

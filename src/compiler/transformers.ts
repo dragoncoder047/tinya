@@ -58,7 +58,7 @@ const TRANSFORM_PASSES = [
     async function trimDefaultSentinelsInBlock(ast: any): Promise<AST.Node> {
         ast = await ast.pipe(trimDefaultSentinelsInBlock);
         if (isinstance(ast, AST.Block)) {
-            for (var i = 0; i < (ast.body.length - 1); i++) {
+            for (var i = 0; i < ast.body.length; i++) {
                 if (isinstance(ast.body[i], AST.DefaultPlaceholder)) {
                     ast.body.splice(i, 1);
                     i--;

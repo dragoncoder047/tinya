@@ -1,5 +1,5 @@
 import { test } from "bun:test";
-import { AST } from "../src/compiler/ast";
+import * as AST from "../src/compiler/ast";
 import { describe } from "node:test";
 import { expectParse, expectParseError } from "./astCheck";
 
@@ -474,7 +474,7 @@ describe("parse definition", () => {
     });
 });
 describe("parse block of commas", () => {
-    test("defaults at all but end get trimmed", async () => {
+    test("defaults get nuked in block", async () => {
         await expectParse(",1, ,2, 3,", {
             __class__: AST.Block,
             body: [
@@ -489,9 +489,6 @@ describe("parse block of commas", () => {
                 {
                     __class__: AST.Value,
                     value: 3,
-                },
-                {
-                    __class__: AST.DefaultPlaceholder
                 }
             ],
         });

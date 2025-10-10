@@ -1,6 +1,6 @@
 import { expect } from "bun:test";
 import { parse } from "../src/compiler";
-import { AST } from "../src/compiler/ast";
+import * as AST from "../src/compiler/ast";
 import { EvalState } from "../src/compiler/evalState";
 import { ErrorNote, ParseError, RuntimeError, SydError } from "../src/compiler/errors";
 
