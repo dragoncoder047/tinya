@@ -1,3 +1,4 @@
+import { Synth } from "../runtime/synth";
 import { AST } from "./ast";
 
 export interface EvalState {
@@ -30,7 +31,7 @@ export type NodeDef = [
     params: [name: string, default_: number | null, type?: NodeValueType][],
     returnType: NodeValueType,
     enumChoices: (Record<string, number> | undefined)[],
-    impl: () => (dt: number, args: number[]) => number,
+    impl: (synth: Synth) => (dt: number, args: number[]) => number,
 ];
 
 export type NodeHelp = {

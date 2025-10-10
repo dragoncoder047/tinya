@@ -243,7 +243,10 @@ describe("parse assignment statements", () => {
     test("simple assignment", async () => {
         await expectParse("a = 1", {
             __class__: AST.Assignment,
-            name: "a",
+            target: {
+                __class__: AST.Name,
+                name: "a",
+            },
             value: {
                 __class__: AST.Value,
                 value: 1
@@ -253,7 +256,10 @@ describe("parse assignment statements", () => {
     test("compound assignment", async () => {
         await expectParse("a += 1", {
             __class__: AST.Assignment,
-            name: "a",
+            target: {
+                __class__: AST.Name,
+                name: "a",
+            },
             value: {
                 __class__: AST.BinaryOp,
                 op: "+",
@@ -797,7 +803,10 @@ describe("expand simple pipe operators", () => {
             body: [
                 {
                     __class__: AST.Assignment,
-                    name: "_pipe_teststring_0_6",
+                    target: {
+                        __class__: AST.Name,
+                        name: "_pipe_teststring_0_6"
+                    },
                     value: {
                         __class__: AST.Call,
                         name: "foo",

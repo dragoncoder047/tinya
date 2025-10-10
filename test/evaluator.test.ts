@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 import { AST } from "../src/compiler/ast";
-import { EvalState, NodeValueType } from "../src/compiler/evalState";
 import { LocationTrace } from "../src/compiler/errors";
+import { EvalState, NodeValueType } from "../src/compiler/evalState";
 import { expectEval, expectEvalError } from "./astCheck";
 
 var dummyState: EvalState;
@@ -100,6 +100,9 @@ describe("variables & scopes", () => {
             value: 200
         });
         await expectEvalError("x", dummyState, "undefined: x");
+    });
+    test("banned assignment targets", async () => {
+        await expectEvalError("[a, b] = [1, 2]", dummyState, "cannot assign to this");
     });
 });
 describe("operations", () => {
@@ -428,6 +431,15 @@ describe("recursion", () => {
                 value: 1
             }),
         });
+    });
+    test("looping via recursion", async () => {
+        const m = mock(() => 1);
+        dummyState.nodes.push(["dummy", [["x", null], ["y", null]], NodeValueType.DECOUPLED_MATH, [], () => m]);
+        await expectEval("@while(@cond, @body) :- {&cond ? (&body, while(&cond, &body)) : 0}; @for(@var, min, max, @body, step=1) :- {&var = &min; while(&var < &max, (&body, &var += &step))}; for(i, 0, 10, dummy())", dummyState, {
+            __class__: AST.Value,
+            value: 0
+        });
+        expect(m).toHaveBeenCalledTimes(10);
     });
     test("recursion is limited", async () => {
         await expectEvalError("f() :- f(); f()", dummyState, "too much recursion");

@@ -1,6 +1,13 @@
-export * from "./instrument";
-export * from "./macro";
-export * from "./lib/macros/effectMacros";
-export * from "./channel";
-export * from "./play";
-// export * from "./zzfx.ts";
+export { baseEnv, baseCompileState, nodes, nodeHelp } from "./lib";
+export { AST } from "./compiler/ast";
+export { SydError, LocationTrace, ParseError, CompileError, RuntimeError } from "./compiler/errors";
+export { parse } from "./compiler";
+export { Message, MessageCode } from "./worklet";
+export { source as libSrc, ast as lib } from "./lib/data.syd";
+
+export function initWorklet(context: AudioContext, pathToWorkletScript?: URL | string) {
+    if (pathToWorkletScript === undefined) {
+        pathToWorkletScript = new URL("./sydWorklet.js", import.meta.url);
+    }
+    context.audioWorklet.addModule(pathToWorkletScript);
+}

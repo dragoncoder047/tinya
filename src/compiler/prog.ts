@@ -1,8 +1,13 @@
-import { NodeDef } from "./evalState";
+import { AutomatedValueMethod } from "../runtime/automation";
 
 export enum Opcode {
     /** next is the constant */
     PUSH_CONSTANT,
+    PUSH_INPUT_SAMPLES,
+    PUSH_PITCH,
+    PUSH_EXPRESSION,
+    PUSH_GATE,
+    MARK_STILL_ALIVE,
     DROP_TOP,
     PUSH_FRESH_EMPTY_LIST,
     APPEND_TO_LIST,
@@ -22,8 +27,8 @@ export enum Opcode {
     APPLY_NODE,
     /** next 3 is node no A and B, argc */
     APPLY_DOUBLE_NODE_STEREO,
-    /** next is input name, returns 0 if doesn't exist */
-    GET_INPUT,
+    /** next is input number, returns 0 if doesn't exist */
+    GET_MOD,
 }
 
 export type Program = (Opcode | number | string)[];
@@ -32,9 +37,8 @@ export interface CompileState {
     p: Program;
     r: string[];
     nn: string[];
-    mod: string[];
     tosStereo: boolean;
-    ni: NodeDef[];
+    mods: [name: string, initial: number, mode: AutomatedValueMethod][]
 }
 
 export function allocRegister(name: string, state: CompileState): number {
@@ -44,4 +48,8 @@ export function allocRegister(name: string, state: CompileState): number {
 }
 export function allocNode(name: string, state: CompileState): number {
     return state.nn.push(name) - 1;
+}
+
+export function allocMod(name: string, state: CompileState, initial: number, mode: AutomatedValueMethod): number {
+    return state.mods.push([name, initial, mode]) - 1;
 }

@@ -1,4 +1,4 @@
-import { NodeDef, NodeHelp, NodeValueType } from "../compiler/evalState";
+import { NodeDef, NodeHelp, NodeValueType } from "../../compiler/evalState";
 export const shimmered: NodeDef = [
     "shimmered",
     [["value", 0], ["amount", 0.05]],

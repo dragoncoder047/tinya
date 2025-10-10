@@ -1,37 +1,31 @@
 import * as esbuild from "esbuild";
-import { execFileSync } from "node:child_process";
-import { basename, dirname, relative, resolve } from "node:path";
-import packageJSON from "../package.json" with { type: "json" };
+import { sydPlugin } from "../src/esbuildPlugin";
 import { opt } from "./com";
+import { rmSync } from "fs";
+
+const outdir = "build";
+rmSync(outdir, { recursive: true, force: true });
 
 const config: esbuild.BuildOptions = {
     bundle: true,
     sourcemap: true,
+    keepNames: true,
     minify: !!opt("-m", false),
     metafile: true,
     platform: "browser",
     charset: "utf8",
-    entryPoints: [opt("-i", true) ?? packageJSON.main],
+    entryPoints: ["src/index.ts", "src/sydWorklet.ts", "src/esbuildPlugin/index.ts"],
     format: "esm",
     target: "esnext",
     treeShaking: true,
-    outfile: opt("-o", true) ?? "build/syd.js",
+    splitting: true,
+    outdir,
     plugins: [
+        sydPlugin(),
         {
-            name: "precache builtin macro code",
+            name: "mark_node:_as_external",
             setup(build) {
-                // Load ".syd" files and return an AST as JS expression
-                build.onLoad({ filter: /\.syd$/ }, async args => {
-                    const tojsScriptPath = resolve(dirname(import.meta.filename), "tojs");
-                    const absSrc = resolve(dirname(import.meta.filename), "../src");
-                    const fileDir = dirname(args.path);
-                    const pathToSrc = relative(fileDir, absSrc);
-                    const code = execFileSync("bun", ["run", tojsScriptPath, "-f", args.path, "-d", basename(args.path), "-p", pathToSrc]);
-                    return {
-                        contents: code,
-                        loader: "js",
-                    }
-                });
+                build.onResolve({ filter: /^node:/ }, () => ({ external: true }))
             },
         }
     ],

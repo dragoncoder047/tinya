@@ -2,9 +2,9 @@ import { isinstance, str } from "../utils";
 import { processArgsInCall } from "./call";
 import { makeCodeMacroExpander } from "./codemacro";
 import { CompileError, ErrorNote, LocationTrace, RuntimeError } from "./errors";
-import { EvalState, NodeValueType } from "./evalState";
+import { EvalState, NodeDef, NodeValueType } from "./evalState";
 import { OPERATORS } from "./operator";
-import { allocRegister, allocNode, CompileState, Opcode, Program } from "./prog";
+import { allocNode, allocRegister, CompileState, Opcode, Program } from "./prog";
 
 export namespace AST {
 
@@ -13,16 +13,16 @@ export namespace AST {
         abstract edgemost(left: boolean): Node;
         abstract pipe(fn: (node: Node) => Promise<Node>): Promise<Node>;
         abstract eval(state: EvalState): Promise<Node>;
-        abstract compile(state: CompileState): void;
+        abstract compile(state: CompileState, ni: NodeDef[]): CompileState;
     }
 
-    abstract class NotCodeNode extends Node {
-        compile(state: CompileState) {
+    export abstract class NotCodeNode extends Node {
+        compile(state: CompileState): CompileState {
             throw new CompileError("how did we get here ?!?", this.loc);
         }
     }
 
-    abstract class Leaf extends NotCodeNode {
+    export abstract class Leaf extends NotCodeNode {
         edgemost() { return this; }
         async pipe() { return this; }
         async eval(_: EvalState): Promise<AST.Node> { return this; }
@@ -64,6 +64,7 @@ export namespace AST {
         compile(state: CompileState) {
             state.p.push(Opcode.PUSH_CONSTANT, this.value);
             state.tosStereo = false;
+            return state;
         }
     }
 
@@ -75,16 +76,21 @@ export namespace AST {
     }
 
     export class Assignment extends Node {
-        constructor(trace: LocationTrace, public name: string, public value: Node) { super(trace); };
-        edgemost(left: boolean): Node { return left ? this : this.value.edgemost(left); }
-        async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Assignment(this.loc, this.name, await fn(this.value)); }
+        constructor(trace: LocationTrace, public target: Node, public value: Node) { super(trace); };
+        edgemost(left: boolean): Node { return left ? this.target.edgemost(left) : this.value.edgemost(left); }
+        async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Assignment(this.loc, await fn(this.target), await fn(this.value)); }
         async eval(state: EvalState) {
-            const scope = Object.hasOwn(state.env, this.name) ? state.env : Object.hasOwn(state.globalEnv, this.name) ? state.globalEnv : state.env;
-            return scope[this.name] = await this.value.eval(state);
+            if (!isinstance(this.target, Name)) {
+                throw new RuntimeError("cannot assign to this", this.target.loc);
+            }
+            const name = this.target.name;
+            const scope = Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
+            return scope[name] = await this.value.eval(state);
         }
-        compile(state: CompileState) {
-            this.value.compile(state);
-            state.p.push(Opcode.TAP_REGISTER, allocRegister(this.name, state));
+        compile(state: CompileState, ni: NodeDef[]) {
+            this.value.compile(state, ni);
+            state.p.push(Opcode.TAP_REGISTER, allocRegister((this.target as any).name, state));
+            return state;
         }
     }
 
@@ -99,6 +105,7 @@ export namespace AST {
         }
         compile(state: CompileState) {
             state.p.push(Opcode.GET_REGISTER, allocRegister(this.name, state));
+            return state;
         }
     }
 
@@ -110,9 +117,6 @@ export namespace AST {
             const funcImpl = state.functions.find(f => f[0] === this.name);
             if (funcImpl) {
                 const [name, argc, impl] = funcImpl;
-                if ((argc ?? -1) >= 0 && this.args.length !== argc) {
-                    throw new RuntimeError(`wrong number of arguments to function ${name} (expected ${argc}, got ${this.args.length})`, this.loc, stackToNotes(state.callstack));
-                }
                 const newState: EvalState = { ...state, callstack: state.callstack.concat(this) };
                 return impl(this.args, newState);
             }
@@ -122,13 +126,13 @@ export namespace AST {
             }
             var x: List;
             if (nodeImpl[2] === NodeValueType.DECOUPLED_MATH && (x = new List(this.loc, this.args)).isImmediate()) {
-                return new Value(this.loc, nodeImpl[4]()(null!, x.toImmediate()!));
+                return new Value(this.loc, nodeImpl[4]!(null as any)(null!, x.toImmediate()!));
             }
             return new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl));
         }
-        compile(state: CompileState) {
+        compile(state: CompileState, ni: NodeDef[]) {
             var i: number;
-            const nodeImpl = state.ni.find(n => n[0] === this.name);
+            const nodeImpl = ni.find(n => n[0] === this.name);
             if (!nodeImpl) {
                 throw new CompileError(`cannot find node ${this.name} (should be unreachable!!)`, this.loc);
             }
@@ -136,7 +140,7 @@ export namespace AST {
             const existingProg: Program = state.p;
             for (i = 0; i < this.args.length; i++) {
                 state.p = [];
-                this.args[i]!.compile(state);
+                this.args[i]!.compile(state, ni);
                 argProgs.push([state.p, state.tosStereo ? NodeValueType.STEREO : NodeValueType.NORMAL_OR_MONO]);
             }
             state.p = existingProg;
@@ -176,6 +180,7 @@ export namespace AST {
                 state.p.push(...argProgs[i]![0]);
             }
             state.p.push(...callProg);
+            return state;
         }
     }
 
@@ -209,7 +214,7 @@ export namespace AST {
         static fromImmediate(trace: LocationTrace, m: any[]): List | Value {
             return Array.isArray(m) ? new List(trace, m.map(r => List.fromImmediate(trace, r))) : new Value(trace, m);
         }
-        compile(state: CompileState) {
+        compile(state: CompileState, ni: NodeDef[]) {
             if (this.isImmediate()) {
                 const imm = this.toImmediate() as any;
                 state.p.push(Opcode.PUSH_CONSTANT, imm);
@@ -217,15 +222,16 @@ export namespace AST {
                 state.p.push(Opcode.PUSH_FRESH_EMPTY_LIST);
                 for (var arg of this.values) {
                     if (isinstance(arg, SplatValue)) {
-                        arg.value.compile(state);
+                        arg.value.compile(state, ni);
                         state.p.push(Opcode.EXTEND_TO_LIST);
                     } else {
-                        arg.compile(state);
+                        arg.compile(state, ni);
                         state.p.push(Opcode.APPEND_TO_LIST);
                     }
                 }
             }
             state.tosStereo = this.values.length === 2;
+            return state;
         }
     }
 
@@ -308,10 +314,11 @@ export namespace AST {
             }
             return new BinaryOp(this.loc, this.op, left, right);
         }
-        compile(state: CompileState) {
-            this.left.compile(state);
-            this.right.compile(state);
+        compile(state: CompileState, ni: NodeDef[]) {
+            this.left.compile(state, ni);
+            this.right.compile(state, ni);
             state.p.push(Opcode.DO_BINARY_OP, this.op);
+            return state;
         }
     }
 
@@ -337,9 +344,10 @@ export namespace AST {
             }
             return new UnaryOp(this.loc, this.op, val);
         }
-        compile(state: CompileState) {
-            this.value.compile(state);
+        compile(state: CompileState, ni: NodeDef[]) {
+            this.value.compile(state, ni);
             state.p.push(Opcode.DO_UNARY_OP, this.op);
+            return state;
         }
     }
 
@@ -386,11 +394,12 @@ export namespace AST {
             }
             return new Conditional(this.loc, cond, await this.caseTrue.eval(state), await this.caseFalse.eval(state));
         }
-        compile(state: CompileState) {
-            this.caseFalse.compile(state);
-            this.caseTrue.compile(state);
-            this.cond.compile(state);
+        compile(state: CompileState, ni: NodeDef[]) {
+            this.caseFalse.compile(state, ni);
+            this.caseTrue.compile(state, ni);
+            this.cond.compile(state, ni);
             state.p.push(Opcode.CONDITIONAL_SELECT);
+            return state;
         }
     }
 
@@ -430,13 +439,14 @@ export namespace AST {
             }
             return last;
         }
-        compile(state: CompileState) {
+        compile(state: CompileState, ni: NodeDef[]) {
             for (var arg of this.body) {
-                arg.compile(state);
+                arg.compile(state, ni);
                 state.p.push(Opcode.DROP_TOP);
             }
             // *Don't* drop the last value
             state.p.pop();
+            return state;
         }
     }
 

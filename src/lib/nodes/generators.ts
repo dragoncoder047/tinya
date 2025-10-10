@@ -3,7 +3,7 @@ import { abs, noise3, noise5, saw, sgn, sin, tan, TAU, tri } from "../../math";
 
 export const zzfxOscillator: NodeDef = [
     "zzfxOscillator",
-    [["frequency", null], ["shape", 0], ["distortion", 1], ["noise", 0], ["phaseMod", 0]],
+    [["freq", null], ["shape", 0], ["distortion", 1], ["noise", 0], ["phi", 0]],
     NodeValueType.NORMAL_OR_MONO,
     [, { sine: 0, triangle: 1, sawtooth: 2, tangent: 3, noise3: 4 }],
     () => {
@@ -18,7 +18,7 @@ export const zzfxOscillator: NodeDef = [
 export const zzfxOscillatorHelp: NodeHelp = {
     description: "Multi-waveform oscillator like that of ZzFX.",
     parameters: {
-        frequency: {
+        freq: {
             unit: "Hz",
             range: [0, 20000],
         },
@@ -33,7 +33,7 @@ export const zzfxOscillatorHelp: NodeHelp = {
             range: [0, 100],
             description: "How much extra noise to add to the wave.",
         },
-        phaseMod: {
+        phi: {
             range: [0, 1],
             unit: "cycles (NOT radians!)",
             description: "Modulates the oscillator's phase without adding to the internal accumulator. Useful for FM synthesis."

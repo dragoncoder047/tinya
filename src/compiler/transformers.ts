@@ -114,7 +114,7 @@ const TRANSFORM_PASSES = [
                     enums = param.right;
                     for (var { key } of enums.mapping) {
                         if (!isinstance(key, AST.Symbol)) {
-                            throw new ParseError("expected a symbol here", key.edgemost(false).loc, [new ErrorNote(`note: while defining enum options for parameter ${str(name.name)}`, name.loc), ...(isinstance(key, AST.Name) ? [new ErrorNote(`hint: put a "." before the ${str(key.name)} to make it a static symbol instead of a variable`, key.loc)] : [])]);
+                            throw new ParseError("expected a symbol here", key.edgemost(false).loc, [new ErrorNote(`note: while defining enum options for parameter`, name.loc), ...(isinstance(key, AST.Name) ? [new ErrorNote(`hint: put a "." before the ${str(key.name)} to make it a static symbol instead of a variable`, key.loc)] : [])]);
                         }
                     }
                     break;
@@ -152,14 +152,11 @@ const TRANSFORM_PASSES = [
     async function expandAssignments(ast: AST.Node): Promise<AST.Node> {
         if (!isinstance(ast, AST.BinaryOp) || (ast.op !== "=" && !ast.assign)) return ast.pipe(expandAssignments);
         const target = await ast.left.pipe(expandAssignments);
-        const body = await ast.right.pipe(expandAssignments);
-        if (!isinstance(target, AST.Name)) {
-            throw new ParseError("illegal assignment target", target.edgemost(true).loc);
-        }
+        var body = await ast.right.pipe(expandAssignments);
         if (ast.assign) {
-            return new AST.Assignment(target.loc, target.name, new AST.BinaryOp(ast.loc, ast.op, target, body, ast.noLift));
+            body = new AST.BinaryOp(ast.loc, ast.op, target, body);
         }
-        return new AST.Assignment(target.loc, target.name, body);
+        return new AST.Assignment(target.loc, target, body);
     },
 
     async function expandTernaryOperators(ast: AST.Node): Promise<AST.Node> {
@@ -218,7 +215,7 @@ const TRANSFORM_PASSES = [
         if (numPlaceholders === 0) {
             throw new ParseError("missing '#' placeholder in pipe expression", expr.loc, [new ErrorNote("note: required by this pipe operator", ast.loc)]);
         } else if (numPlaceholders > 1 && !isinstance(arg, AST.Value)) {
-            return new AST.Block(ast.loc, [new AST.Assignment(ast.loc, sym.name, arg), await replacePlaceholdersWith(expr, sym)]);
+            return new AST.Block(ast.loc, [new AST.Assignment(ast.loc, sym, arg), await replacePlaceholdersWith(expr, sym)]);
         } else {
             return replacePlaceholdersWith(expr, arg);
         }

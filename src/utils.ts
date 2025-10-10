@@ -1,8 +1,6 @@
 // export const mapObject = <T, U>(obj: Record<string, T>, func: (value: T, key: string) => U): Record<string, U> =>
 //     Object.fromEntries(Object.entries(obj).map(([key, value]) => [key, func(value, key)]));
 
-export const map = (n: number, x: number, y: number, a: number, b: number) => (n - x) * (b - a) / (y - x) + a;
-
 const typeOf = (x: any) => typeof x;
 export const is = (t: string, func: (x: any) => any = typeOf) => (x: any) => func(x) === t;
 export const isNumber = is("number") as (x: any) => x is number;
@@ -36,12 +34,19 @@ export const isArray = Array.isArray;
 
 export const str = JSON.stringify;
 
-const gensymCounters: Record<string, number> = {};
-export function gensym<T extends string>(prefix: T): `${T}${number}` {
-    gensymCounters[prefix] = (gensymCounters[prefix] || 0) + 1;
-    return `${prefix}${gensymCounters[prefix]}` as const;
-}
+// const gensymCounters: Record<string, number> = {};
+// export function gensym<T extends string>(prefix: T): `${T}${number}` {
+//     gensymCounters[prefix] = (gensymCounters[prefix] || 0) + 1;
+//     return `${prefix}${gensymCounters[prefix]}` as const;
+// }
 
 export function isinstance<C>(obj: any, cls: abstract new (...args: any[]) => C): obj is C {
     return obj instanceof cls;
+}
+
+const idMap = new WeakMap<Object, number>();
+var idCounter = 0;
+export const id = (obj: any): number => {
+    if (!idMap.has(obj)) idMap.set(obj, idCounter++);
+    return idMap.get(obj)!
 }

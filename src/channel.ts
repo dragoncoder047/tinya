@@ -1,7 +1,6 @@
-import type { ChannelImpl } from "./types";
-
-
 /*
+
+TODO: this is all old, from way back before Syd was even called Syd...
 
 channel header:
     undefined or none (number first) = normal or multitrack channel
@@ -32,48 +31,45 @@ Heavy Light cover towards the end of it. The white synth does chords/pad, but al
 purple synth's melody in the bass which doesn't have the same note breaks so I couldn't use
 "continue" transition mode.
 
-
-
-
 */
 
-export type Channel = (number | undefined)[];
+// export type Channel = (number | undefined)[];
 
-const splitTimings = (channel: Channel, sampleRate: number): [number[], number[], number[]] => {
-    const dts = [0], ts = [0], vals = [0];
-    var t = 0;
-    for (var i = 0; i < channel.length; i += 2) {
-        const dt = ((channel[i] ?? 0) * sampleRate);
-        dts.push(dt);
-        ts.push(t);
-        vals.push(channel[i + 1] ?? vals.at(-1)!);
-        t += Math.abs(dt);
-    }
-    return [dts, ts, vals];
-}
+// const splitTimings = (channel: Channel, sampleRate: number): [number[], number[], number[]] => {
+//     const dts = [0], ts = [0], vals = [0];
+//     var t = 0;
+//     for (var i = 0; i < channel.length; i += 2) {
+//         const dt = ((channel[i] ?? 0) * sampleRate);
+//         dts.push(dt);
+//         ts.push(t);
+//         vals.push(channel[i + 1] ?? vals.at(-1)!);
+//         t += Math.abs(dt);
+//     }
+//     return [dts, ts, vals];
+// }
 
-const interpolate = (t: number, a: number, b: number, d: number) =>
-    d <= 0 ? b : a + (b - a) * (t / d);
+// const interpolate = (t: number, a: number, b: number, d: number) =>
+//     d <= 0 ? b : a + (b - a) * (t / d);
 
-export const standardChannel = (sampleRate: number, channel: Channel): ChannelImpl => {
-    const [dts, ts, vals] = splitTimings(channel, sampleRate);
-    var i = 0;
-    return (sampleNo: number) => {
-        if (sampleNo >= ts.at(-1)! + dts.at(-1)!) return 0;
-        while (sampleNo < ts[i]!) i--;
-        while (sampleNo > ts[i]! + dts[i]!) i++;
-        return interpolate(sampleNo - ts[i]!, vals[i - 1] ?? 0, vals[i]!, dts[i]!);
-    }
-}
+// export const standardChannel = (sampleRate: number, channel: Channel): ChannelImpl => {
+//     const [dts, ts, vals] = splitTimings(channel, sampleRate);
+//     var i = 0;
+//     return (sampleNo: number) => {
+//         if (sampleNo >= ts.at(-1)! + dts.at(-1)!) return 0;
+//         while (sampleNo < ts[i]!) i--;
+//         while (sampleNo > ts[i]! + dts[i]!) i++;
+//         return interpolate(sampleNo - ts[i]!, vals[i - 1] ?? 0, vals[i]!, dts[i]!);
+//     }
+// }
 
-export const makeADSRChannel = (attack = 0, decay = 0, sustain = 0, sustainVol = 1, release = .1): Channel =>
-    [attack, 1, decay, sustainVol, sustain, sustainVol, release]
+// export const makeADSRChannel = (attack = 0, decay = 0, sustain = 0, sustainVol = 1, release = .1): Channel =>
+//     [attack, 1, decay, sustainVol, sustain, sustainVol, release]
 
-export const adsrNode = (sampleRate: number, ...params: Parameters<typeof makeADSRChannel>): ChannelImpl => {
-    return standardChannel(sampleRate, makeADSRChannel(...params));
-}
+// export const adsrNode = (sampleRate: number, ...params: Parameters<typeof makeADSRChannel>): ChannelImpl => {
+//     return standardChannel(sampleRate, makeADSRChannel(...params));
+// }
 
-export const channelDuration = (channel: Channel): number => {
-    const [dts, ts] = splitTimings(channel, 1);
-    return ts.at(-1)! + dts.at(-1)!;
-}
+// export const channelDuration = (channel: Channel): number => {
+//     const [dts, ts] = splitTimings(channel, 1);
+//     return ts.at(-1)! + dts.at(-1)!;
+// }

@@ -1,23 +1,21 @@
-// TODO nested macros are broken
+// export const unisons = (oscTemplate: NodeTree, voices = 1, spread = 0, offset = 0, sign = 1, amp = 1 / voices, freqIndex = 1): NodeTree => {
+//     const out: Partial<NodeTree> = ["a"];
+//     const baseFreq = oscTemplate[freqIndex];
+//     for (var i = 1; i <= voices; i++) {
+//         const offsetSemitones = offset + spread * (2 * (i - 1) / ((voices - 1) || 1) - .5);
+//         const offsetFactor = Math.pow(2, offsetSemitones / 12);
+//         out[i] = oscTemplate.with(freqIndex, isNumber(baseFreq) ? baseFreq * offsetFactor : ["g", baseFreq, offsetFactor]) as NodeTree;
+//         if (i > 1 && sign !== 1) out[i] = ["g", sign, out[i]];
+//     }
+//     return amp !== 1 ? ["g", amp, out as NodeTree] : out as NodeTree;
+// }
 
-export const unisons = (oscTemplate: NodeTree, voices = 1, spread = 0, offset = 0, sign = 1, amp = 1 / voices, freqIndex = 1): NodeTree => {
-    const out: Partial<NodeTree> = ["a"];
-    const baseFreq = oscTemplate[freqIndex];
-    for (var i = 1; i <= voices; i++) {
-        const offsetSemitones = offset + spread * (2 * (i - 1) / ((voices - 1) || 1) - .5);
-        const offsetFactor = Math.pow(2, offsetSemitones / 12);
-        out[i] = oscTemplate.with(freqIndex, isNumber(baseFreq) ? baseFreq * offsetFactor : ["g", baseFreq, offsetFactor]) as NodeTree;
-        if (i > 1 && sign !== 1) out[i] = ["g", sign, out[i]];
-    }
-    return amp !== 1 ? ["g", amp, out as NodeTree] : out as NodeTree;
-}
-
-export const combFilter = (input: NodeTree, delayTime: number, feedbackGain: NodeParameter = .9, feedforward = false): NodeTree => {
-    const linkName = gensym("=cff_");
-    const outName = feedforward ? [] : [linkName];
-    const inName = feedforward ? [linkName] : [];
-    return [...outName, "a", [...inName, "a", input], ["g", feedbackGain, ["d", delayTime, , "@" + linkName.slice(1)]]] as any;
-}
+// export const combFilter = (input: NodeTree, delayTime: number, feedbackGain: NodeParameter = .9, feedforward = false): NodeTree => {
+//     const linkName = gensym("=cff_");
+//     const outName = feedforward ? [] : [linkName];
+//     const inName = feedforward ? [linkName] : [];
+//     return [...outName, "a", [...inName, "a", input], ["g", feedbackGain, ["d", delayTime, , "@" + linkName.slice(1)]]] as any;
+// }
 
 // TODO: reverb effect
 
@@ -32,8 +30,3 @@ would be: [[,,[2,3,4],1,5],[,.75,[[1,.25]],0],[,.25,[4],0,5],[2,.25,,0,5]]
 
 */
 
-// MAIN MACROS OBJECT
-export const builtinMacros: Record<string, (...args: any[]) => NodeTree> = {
-    u: unisons, // help me pls why are these name slightly different
-    cf: combFilter,
-};

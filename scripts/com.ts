@@ -5,9 +5,3 @@ export function opt<T extends boolean>(name: string, mustString: T): string | un
     if (option === undefined && mustString) throw "expected option after " + JSON.stringify(name);
     return option ?? true as any;
 }
-
-export function optreq(name: string): string {
-    const ov = opt(name, true);
-    if (ov === undefined) throw "option is required: " + JSON.stringify(name);
-    return ov;
-}

@@ -1,5 +1,6 @@
 import { AST } from "./compiler/ast";
 declare module "*.syd" {
-    const value: AST.Node;
-    export default value;
+    export const ast: AST.Node;
+    export const source: string;
+    export default ast;
 }

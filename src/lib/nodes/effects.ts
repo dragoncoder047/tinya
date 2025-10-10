@@ -104,7 +104,7 @@ export const delayHelp: NodeHelp = {
         time: {
             range: [0, 100],
             unit: "seconds",
-            description: "How long to delay the sample for. Changing this mid-sample"
+            description: "How long to delay the sample for. Changing this mid-delay will effectively pitch-shift the buffered samples"
         }
     }
 };
