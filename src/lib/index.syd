@@ -3,7 +3,8 @@
 /** while - repeats body while cond is true */
 @while(@cond, @body) :- {
     &cond
-        ? (&body, while(&cond, &body))
+        ? (&body;
+            while(&cond, &body))
         : 0
 };
 

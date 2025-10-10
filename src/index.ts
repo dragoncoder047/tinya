@@ -1,10 +1,9 @@
-export { baseEnv, baseCompileState, nodes, nodeHelp } from "./lib";
+export { baseEnv, baseCompileState, nodes, nodeHelp, libSrc, lib } from "./lib";
 export * from "./compiler/ast";
 export * as AST from "./compiler/ast";
 export { SydError, ErrorNote, LocationTrace, ParseError, CompileError, RuntimeError } from "./compiler/errors";
 export { parse } from "./compiler";
 export { Message, MessageCode } from "./worklet";
-export { source as libSrc, ast as lib } from "./lib/data.syd";
 
 export function initWorklet(context: AudioContext, pathToWorkletScript?: URL | string) {
     if (pathToWorkletScript === undefined) {

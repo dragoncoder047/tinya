@@ -1,5 +1,19 @@
 import {
+  Assignment,
+  BinaryOp,
+  Block,
+  Call,
+  Conditional,
+  DefaultPlaceholder,
+  Definition,
+  InterpolatedValue,
+  LocationTrace,
+  Mapping,
+  Name,
+  ParameterDescriptor,
   TAU,
+  Template,
+  Value,
   __name,
   abs,
   cos,
@@ -10,7 +24,7 @@ import {
   sin,
   tan,
   tri
-} from "./chunk-PAJYDYBO.js";
+} from "./chunk-YGXSPSEX.js";
 
 // src/lib/nodes/effects.ts
 var zzfxFilter = [
@@ -245,6 +259,310 @@ var clockHelp = {
   }
 };
 
+// src/lib/index.syd
+var sources = {
+  "index.syd": [
+    "// basic control flow stuff",
+    "",
+    "/** while - repeats body while cond is true */",
+    "@while(@cond, @body) :- {",
+    "    &cond",
+    "        ? (&body;",
+    "            while(&cond, &body))",
+    "        : 0",
+    "};",
+    "",
+    "/**",
+    " * for - repeats body with var running through min-max",
+    " * (equivalent to `for (var = min; var < max; var += step) {body}` in JS)",
+    " */",
+    "@for(@var, min, max, @body, step=1) :- {",
+    "    &var = &min;",
+    "    while(&var < &max, (",
+    "        &body;",
+    "        &var += &step",
+    "    ))",
+    "};",
+    "",
+    "/** quotes the expression and does NOT evaluate it - returns the AST node verbatim */",
+    "quote(@code) :- code;",
+    "",
+    "/** forces the code to be expanded in the caller's local scope */",
+    "@expand(code) :- code;",
+    ""
+  ]
+};
+var _str0while = "while";
+var _str1cond = "cond";
+var _str2indexsyd = "index.syd";
+var _str3body = "body";
+var _str4for = "for";
+var _str5var = "var";
+var _str6min = "min";
+var _str7max = "max";
+var _str8step = "step";
+var _str9 = "<";
+var _str10 = "+";
+var _str11quote = "quote";
+var _str12code = "code";
+var _str13expand = "expand";
+var _indexsyd_0 = new Block(
+  new LocationTrace(3, 0, _str2indexsyd),
+  [
+    new Definition(
+      new LocationTrace(3, 1, _str2indexsyd),
+      _str0while,
+      true,
+      [
+        new ParameterDescriptor(
+          new LocationTrace(3, 8, _str2indexsyd),
+          _str1cond,
+          new Mapping(
+            new LocationTrace(3, 8, _str2indexsyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(3, 8, _str2indexsyd)),
+          true
+        ),
+        new ParameterDescriptor(
+          new LocationTrace(3, 15, _str2indexsyd),
+          _str3body,
+          new Mapping(
+            new LocationTrace(3, 15, _str2indexsyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(3, 15, _str2indexsyd)),
+          true
+        )
+      ],
+      new Template(
+        new LocationTrace(3, 24, _str2indexsyd),
+        new Conditional(
+          new LocationTrace(5, 8, _str2indexsyd),
+          new InterpolatedValue(
+            new LocationTrace(4, 4, _str2indexsyd),
+            new Name(
+              new LocationTrace(4, 5, _str2indexsyd),
+              _str1cond
+            )
+          ),
+          new Block(
+            new LocationTrace(5, 12, _str2indexsyd),
+            [
+              new InterpolatedValue(
+                new LocationTrace(5, 11, _str2indexsyd),
+                new Name(
+                  new LocationTrace(5, 12, _str2indexsyd),
+                  _str3body
+                )
+              ),
+              new Call(
+                new LocationTrace(6, 12, _str2indexsyd),
+                _str0while,
+                [
+                  new InterpolatedValue(
+                    new LocationTrace(6, 18, _str2indexsyd),
+                    new Name(
+                      new LocationTrace(6, 19, _str2indexsyd),
+                      _str1cond
+                    )
+                  ),
+                  new InterpolatedValue(
+                    new LocationTrace(6, 25, _str2indexsyd),
+                    new Name(
+                      new LocationTrace(6, 26, _str2indexsyd),
+                      _str3body
+                    )
+                  )
+                ]
+              )
+            ]
+          ),
+          new Value(
+            new LocationTrace(7, 10, _str2indexsyd),
+            0
+          )
+        )
+      )
+    ),
+    new Definition(
+      new LocationTrace(14, 1, _str2indexsyd),
+      _str4for,
+      true,
+      [
+        new ParameterDescriptor(
+          new LocationTrace(14, 6, _str2indexsyd),
+          _str5var,
+          new Mapping(
+            new LocationTrace(14, 6, _str2indexsyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(14, 6, _str2indexsyd)),
+          true
+        ),
+        new Name(
+          new LocationTrace(14, 11, _str2indexsyd),
+          _str6min
+        ),
+        new Name(
+          new LocationTrace(14, 16, _str2indexsyd),
+          _str7max
+        ),
+        new ParameterDescriptor(
+          new LocationTrace(14, 22, _str2indexsyd),
+          _str3body,
+          new Mapping(
+            new LocationTrace(14, 22, _str2indexsyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(14, 22, _str2indexsyd)),
+          true
+        ),
+        new ParameterDescriptor(
+          new LocationTrace(14, 28, _str2indexsyd),
+          _str8step,
+          new Mapping(
+            new LocationTrace(14, 32, _str2indexsyd),
+            []
+          ),
+          new Value(
+            new LocationTrace(14, 33, _str2indexsyd),
+            1
+          ),
+          false
+        )
+      ],
+      new Template(
+        new LocationTrace(14, 39, _str2indexsyd),
+        new Block(
+          new LocationTrace(15, 5, _str2indexsyd),
+          [
+            new Assignment(
+              new LocationTrace(15, 4, _str2indexsyd),
+              new InterpolatedValue(
+                new LocationTrace(15, 4, _str2indexsyd),
+                new Name(
+                  new LocationTrace(15, 5, _str2indexsyd),
+                  _str5var
+                )
+              ),
+              new InterpolatedValue(
+                new LocationTrace(15, 11, _str2indexsyd),
+                new Name(
+                  new LocationTrace(15, 12, _str2indexsyd),
+                  _str6min
+                )
+              )
+            ),
+            new Call(
+              new LocationTrace(16, 4, _str2indexsyd),
+              _str0while,
+              [
+                new BinaryOp(
+                  new LocationTrace(16, 15, _str2indexsyd),
+                  _str9,
+                  new InterpolatedValue(
+                    new LocationTrace(16, 10, _str2indexsyd),
+                    new Name(
+                      new LocationTrace(16, 11, _str2indexsyd),
+                      _str5var
+                    )
+                  ),
+                  new InterpolatedValue(
+                    new LocationTrace(16, 17, _str2indexsyd),
+                    new Name(
+                      new LocationTrace(16, 18, _str2indexsyd),
+                      _str7max
+                    )
+                  )
+                ),
+                new Block(
+                  new LocationTrace(17, 9, _str2indexsyd),
+                  [
+                    new InterpolatedValue(
+                      new LocationTrace(17, 8, _str2indexsyd),
+                      new Name(
+                        new LocationTrace(17, 9, _str2indexsyd),
+                        _str3body
+                      )
+                    ),
+                    new Assignment(
+                      new LocationTrace(18, 8, _str2indexsyd),
+                      new InterpolatedValue(
+                        new LocationTrace(18, 8, _str2indexsyd),
+                        new Name(
+                          new LocationTrace(18, 9, _str2indexsyd),
+                          _str5var
+                        )
+                      ),
+                      new BinaryOp(
+                        new LocationTrace(18, 13, _str2indexsyd),
+                        _str10,
+                        new InterpolatedValue(
+                          new LocationTrace(18, 8, _str2indexsyd),
+                          new Name(
+                            new LocationTrace(18, 9, _str2indexsyd),
+                            _str5var
+                          )
+                        ),
+                        new InterpolatedValue(
+                          new LocationTrace(18, 16, _str2indexsyd),
+                          new Name(
+                            new LocationTrace(18, 17, _str2indexsyd),
+                            _str8step
+                          )
+                        )
+                      )
+                    )
+                  ]
+                )
+              ]
+            )
+          ]
+        )
+      )
+    ),
+    new Definition(
+      new LocationTrace(23, 0, _str2indexsyd),
+      _str11quote,
+      false,
+      [
+        new ParameterDescriptor(
+          new LocationTrace(23, 7, _str2indexsyd),
+          _str12code,
+          new Mapping(
+            new LocationTrace(23, 7, _str2indexsyd),
+            []
+          ),
+          new DefaultPlaceholder(new LocationTrace(23, 7, _str2indexsyd)),
+          true
+        )
+      ],
+      new Name(
+        new LocationTrace(23, 16, _str2indexsyd),
+        _str12code
+      )
+    ),
+    new Definition(
+      new LocationTrace(26, 1, _str2indexsyd),
+      _str13expand,
+      true,
+      [
+        new Name(
+          new LocationTrace(26, 8, _str2indexsyd),
+          _str12code
+        )
+      ],
+      new Name(
+        new LocationTrace(26, 17, _str2indexsyd),
+        _str12code
+      )
+    ),
+    new DefaultPlaceholder(new LocationTrace(26, 21, _str2indexsyd))
+  ]
+);
+var ast = _indexsyd_0;
+
 // src/lib/index.ts
 function nodes() {
   return [
@@ -306,11 +624,23 @@ var MessageCode = /* @__PURE__ */ ((MessageCode2) => {
   return MessageCode2;
 })(MessageCode || {});
 
+// src/index.ts
+function initWorklet(context, pathToWorkletScript) {
+  if (pathToWorkletScript === void 0) {
+    pathToWorkletScript = new URL("./sydWorklet.js", import.meta.url);
+  }
+  context.audioWorklet.addModule(pathToWorkletScript);
+}
+__name(initWorklet, "initWorklet");
+
 export {
+  sources,
+  ast,
   nodes,
   baseEnv,
   baseCompileState,
   nodeHelp,
-  MessageCode
+  MessageCode,
+  initWorklet
 };
-//# sourceMappingURL=chunk-P55TU4U3.js.map
+//# sourceMappingURL=chunk-SJLLO3ZN.js.map

@@ -7,37 +7,82 @@ import {
   Conditional,
   DefaultPlaceholder,
   Definition,
+  ErrorNote,
   InterpolatedValue,
   KeywordArgument,
+  Leaf,
   List,
   Mapping,
   Name,
   ParameterDescriptor,
+  ParseError,
   PipePlaceholder,
   SplatValue,
   Symbol,
   Template,
   UnaryOp,
   Value,
-  parse
-} from "../chunk-G32GKSBF.js";
-import {
-  ParseError,
   __name,
   isinstance,
+  parse,
   str
-} from "../chunk-PAJYDYBO.js";
+} from "../chunk-YGXSPSEX.js";
 
-// src/esbuildPlugin/index.ts
-import { basename } from "node:path";
+// src/esbuildPlugin/include.ts
+import { readFileSync } from "node:fs";
+import { basename, dirname, resolve } from "node:path";
+var IncludePlaceholder = class extends Leaf {
+  constructor(loc, varname) {
+    super(loc);
+    this.varname = varname;
+  }
+  static {
+    __name(this, "IncludePlaceholder");
+  }
+};
+async function processIncludes(entrypoint, outSourceFileMap) {
+  const includeOrder = [];
+  const includeCounter = { value: 0 };
+  const filemap = {};
+  const seenFiles = /* @__PURE__ */ new Set();
+  await doInclude(entrypoint, filemap, outSourceFileMap, includeCounter, includeOrder, seenFiles, []);
+  return [includeOrder, filemap];
+}
+__name(processIncludes, "processIncludes");
+async function doInclude(filename, filemap, sourceMap, includeCounter, includeOrder, seenFiles, includeStack) {
+  const currentFileNameVar = "_" + basename(filename).replace(/\W/g, "").toLowerCase() + "_" + includeCounter.value++;
+  const walk = /* @__PURE__ */ __name(async (ast) => {
+    if (!isinstance(ast, AnnotatedValue) || !isinstance(ast.value, Value) || typeof ast.value.value !== "string" || ast.attributes.length !== 1 || !isinstance(ast.attributes[0], Name) || ast.attributes[0].name !== "include") return ast.pipe(walk);
+    const f = resolve(dirname(filename), ast.value.value);
+    if (seenFiles.has(f)) {
+      throw new ParseError("circular import", ast.value.loc, includeStack.map((v) => new ErrorNote("note: included from here:", v.loc)));
+    }
+    try {
+      await doInclude(f, filemap, sourceMap, includeCounter, includeOrder, seenFiles, [...includeStack, ast.value]);
+    } catch (e) {
+      if (e.code === "ENOENT") {
+        throw new ParseError("no such file " + str(f), ast.value.loc, includeStack.map((v) => new ErrorNote("note: included from here:", v.loc)));
+      }
+      throw e;
+    }
+    return new IncludePlaceholder(ast.loc, currentFileNameVar);
+  }, "walk");
+  seenFiles.add(filename);
+  includeOrder.unshift(currentFileNameVar);
+  filemap[currentFileNameVar] = await walk(await parseFile(filename, sourceMap));
+}
+__name(doInclude, "doInclude");
+async function parseFile(filename, filemap) {
+  return await parse(filemap[basename(filename)] = readFileSync(filename, "utf8"), basename(filename));
+}
+__name(parseFile, "parseFile");
 
 // src/esbuildPlugin/tojs.ts
-import { readFileSync } from "node:fs";
 var internedStrings = /* @__PURE__ */ new Map();
 var internStringCounter = 0;
 function internString(s) {
   if (!internedStrings.has(s)) {
-    internedStrings.set(s, "_str" + internStringCounter++ + s.toLowerCase().replaceAll(/[^\w]/g, ""));
+    internedStrings.set(s, "_str" + internStringCounter++ + s.toLowerCase().replaceAll(/\W/g, ""));
   }
   return internedStrings.get(s);
 }
@@ -115,15 +160,16 @@ function toJS(ast) {
     return code("ParameterDescriptor", ast, prim(ast.name), toJS(ast.enumOptions), toJS(ast.defaultValue), prim(ast.lazy));
   if (isinstance(ast, Mapping))
     return code("Mapping", ast, liststr(ast.mapping.map(({ key, val }) => `{ key: ${toJS(key)}, val: ${toJS(val)} }`)));
+  if (isinstance(ast, IncludePlaceholder))
+    return ast.varname;
   throw "unreachable";
 }
 __name(toJS, "toJS");
-async function toJSFile(filename, displayFilename) {
-  const input = readFileSync(filename, "utf8");
-  const files = { [displayFilename]: input };
-  var ast;
+async function toJSFile(filename) {
+  var includeOrder, modules;
+  const files = {};
   try {
-    ast = await parse(input, displayFilename);
+    [includeOrder, modules] = await processIncludes(filename, files);
   } catch (e) {
     if (!isinstance(e, ParseError)) throw e;
     console.error(e.displayOn(files));
@@ -132,15 +178,19 @@ async function toJSFile(filename, displayFilename) {
   internStringCounter = 0;
   internedStrings.clear();
   neededNames.clear();
-  const js = toJS(ast);
   neededNames.add("LocationTrace");
+  const js = includeOrder.map((m) => `const ${m} = ${toJS(modules[m])}`).join("\n\n");
   return `import { ${[...neededNames.values()].join(", ")} } from "syd";
 
-export const source = /* @__PURE__ */ ${str(input.split("\n"), null, 4)}.join("\\n");
+export const sources = /* @__PURE__ */ {
+    ${Object.entries(files).map(([name, source]) => str(name) + ":\n" + indent(str(source.split("\n"), null, 4))).join(",\n    ")}
+};
 
 ${getInternedStrings()}
 
-export const ast = ${js};
+${js}
+
+export const ast = ${includeOrder.at(-1)};
 
 export default ast;
 `;
@@ -154,7 +204,7 @@ function sydPlugin() {
     setup(build) {
       build.onLoad({ filter: /\.syd$/ }, async (args) => {
         return {
-          contents: await toJSFile(args.path, basename(args.path)),
+          contents: await toJSFile(args.path),
           loader: "js"
         };
       });

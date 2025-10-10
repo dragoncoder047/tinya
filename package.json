@@ -31,7 +31,7 @@
         "lint": "tsc",
         "test": "pnpm bun test --todo",
         "test:watch": "pnpm test --watch",
-        "prepare": "pnpm build"
+        "prepare": "pnpm build -m"
     },
     "keywords": [],
     "author": "dragoncoder047",

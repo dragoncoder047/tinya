@@ -50,3 +50,5 @@ export function nodeHelp(): Record<string, NodeHelp> {
         clock: clockHelp
     }
 }
+
+export { sources as libSrc, ast as lib } from "./index.syd";

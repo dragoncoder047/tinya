@@ -1,20 +1,74 @@
-import {
-  CompileError,
-  ErrorNote,
-  LocationTrace,
-  OPERATORS,
-  OP_REGEX,
-  ParseError,
-  RuntimeError,
-  __export,
-  __name,
-  allocNode,
-  allocRegister,
-  getPrecedenceAndCheckValidity,
-  isRightAssociative,
-  isinstance,
-  str
-} from "./chunk-PAJYDYBO.js";
+var __defProp = Object.defineProperty;
+var __name = (target, value) => __defProp(target, "name", { value, configurable: true });
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+
+// src/compiler/errors.ts
+var LocationTrace = class _LocationTrace {
+  constructor(line, col, file, source = null) {
+    this.line = line;
+    this.col = col;
+    this.file = file;
+    this.source = source;
+  }
+  static {
+    __name(this, "LocationTrace");
+  }
+  static nowhere = new _LocationTrace(0, 0, "unknown");
+};
+function formatTrace(trace, message, sources) {
+  const src = sources[trace.file];
+  var lineInfo = "";
+  if (src) {
+    const lines = src.split("\n");
+    const relevantLine = lines[trace.line] || "";
+    const lineNumberString = trace.line + 1 + "";
+    lineInfo = `
+${lineNumberString} | ${relevantLine}
+${" ".repeat(lineNumberString.length)} | ${" ".repeat(trace.col)}^`;
+  }
+  return `${trace.file}:${trace.line + 1}:${trace.col + 1}: ${message}${lineInfo}${trace.source ? "\n" + formatTrace(trace.source[1], trace.source[0], sources) : ""}`;
+}
+__name(formatTrace, "formatTrace");
+var ErrorNote = class {
+  constructor(message, location) {
+    this.message = message;
+    this.location = location;
+  }
+  static {
+    __name(this, "ErrorNote");
+  }
+};
+var SydError = class extends Error {
+  constructor(message, trace = LocationTrace.nowhere, notes = []) {
+    super(message);
+    this.trace = trace;
+    this.notes = notes;
+  }
+  static {
+    __name(this, "SydError");
+  }
+  displayOn(sources) {
+    return formatTrace(this.trace, "error: " + this.message, sources) + this.notes.map((note) => "\n" + formatTrace(note.location, note.message, sources)).join("") + "\n";
+  }
+};
+var ParseError = class extends SydError {
+  static {
+    __name(this, "ParseError");
+  }
+};
+var RuntimeError = class extends SydError {
+  static {
+    __name(this, "RuntimeError");
+  }
+};
+var CompileError = class extends SydError {
+  static {
+    __name(this, "CompileError");
+  }
+};
 
 // src/compiler/ast.ts
 var ast_exports = {};
@@ -38,12 +92,23 @@ __export(ast_exports, {
   ParameterDescriptor: () => ParameterDescriptor,
   PipePlaceholder: () => PipePlaceholder,
   SplatValue: () => SplatValue,
-  Symbol: () => Symbol,
+  Symbol: () => Symbol2,
   Template: () => Template,
   UnaryOp: () => UnaryOp,
   Value: () => Value,
   stackToNotes: () => stackToNotes
 });
+
+// src/utils.ts
+var typeOf = /* @__PURE__ */ __name((x) => typeof x, "typeOf");
+var is = /* @__PURE__ */ __name((t, func = typeOf) => (x) => func(x) === t, "is");
+var isNumber = is("number");
+var isArray = Array.isArray;
+var str = JSON.stringify;
+function isinstance(obj, cls) {
+  return obj instanceof cls;
+}
+__name(isinstance, "isinstance");
 
 // src/compiler/call.ts
 async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
@@ -72,7 +137,7 @@ async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
     const enumChoices = nodeImpl[3][argIndex] ?? null;
     const walkAndReplaceSymbols = /* @__PURE__ */ __name(async (ast) => {
       if (isinstance(ast, Call)) return ast;
-      if (isinstance(ast, Symbol)) {
+      if (isinstance(ast, Symbol2)) {
         var value2 = enumChoices?.[ast.value];
         if ((value2 ?? void 0) === void 0) {
           throw new RuntimeError(enumChoices ? `unknown symbol name ${str(ast.value)} for parameter` : "symbol constant not valid here", ast.loc, enumChoices ? [new ErrorNote("note: valid options are: " + Object.keys(enumChoices).join(", "), ast.loc)] : []);
@@ -154,6 +219,141 @@ function makeCodeMacroExpander(name, finalMacro, params, body) {
   return f;
 }
 __name(makeCodeMacroExpander, "makeCodeMacroExpander");
+
+// src/math.ts
+var PI = Math.PI;
+var TAU = 2 * PI;
+var min = Math.min;
+var max = Math.max;
+var clamp = /* @__PURE__ */ __name((x, y, z) => max(min(x, z), y), "clamp");
+var sin = Math.sin;
+var cos = Math.cos;
+var sgn = Math.sign;
+var abs = Math.abs;
+var tan = /* @__PURE__ */ __name((x) => clamp(Math.tan(x), -1, 1), "tan");
+var saw = /* @__PURE__ */ __name((x) => 1 - (2 * x / TAU % 2 + 2) % 2, "saw");
+var tri = /* @__PURE__ */ __name((x) => 1 - 4 * abs(Math.round(x / TAU) - x / TAU), "tri");
+var noise3 = /* @__PURE__ */ __name((x) => sin(x ** 3), "noise3");
+var noise5 = /* @__PURE__ */ __name((x) => sin(x ** 5), "noise5");
+var matMul = /* @__PURE__ */ __name((a, b) => {
+  var aNumRows = a.length, aNumCols = a[0].length, bNumCols = b[0].length, m = [];
+  for (var r = 0; r < aNumRows; r++) {
+    m[r] = [];
+    for (var c = 0; c < bNumCols; c++) {
+      m[r][c] = 0;
+      for (var i = 0; i < aNumCols; i++) {
+        m[r][c] += a[r][i] * b[i][c];
+      }
+    }
+  }
+  return m;
+}, "matMul");
+
+// src/compiler/operator.ts
+var INVALID = -1;
+var Operator = class {
+  constructor(b, u = INVALID, r = false) {
+    this.b = b;
+    this.u = u;
+    this.r = r;
+  }
+  static {
+    __name(this, "Operator");
+  }
+  cb = null;
+  cu = null;
+  code(b, u = null) {
+    this.cb = b;
+    this.cu = u;
+    return this;
+  }
+};
+var op = /* @__PURE__ */ __name((b, u, r) => new Operator(b, u, r), "op");
+var OPERATORS = {
+  // attribute sigil
+  "#!": op(INVALID, -Infinity),
+  // symbol name
+  ".": op(INVALID, -Infinity),
+  // interpolate and bitwise AND
+  "&": op(6, 0).code((a, b) => a & b),
+  // length or as 0-ary pipeline placeholder (that is handled specially)
+  "#": op(INVALID, 0).code(null, (a) => a.length),
+  // boolean NOT
+  "!": op(INVALID, 0).code(null, (a) => !a),
+  // power
+  "**": op(1, INVALID, true).code((a, b) => a ** b),
+  // multiply or splat operator
+  "*": op(3, -Infinity).code((a, b) => a * b),
+  // divide & modulo
+  "/": op(3).code((a, b) => a / b),
+  "%": op(3).code((a, b) => a % b),
+  // matrix multiply
+  // or decorator to mark param or declaration as lazy/macro
+  "@": op(3, -Infinity).code(matMul),
+  // add
+  "+": op(4).code((a, b) => a + b),
+  // subtract, negate
+  "-": op(4, 2).code((a, b) => a - b, (a) => -a),
+  // boolean OR / AND
+  "||": op(5).code((a, b) => a || b),
+  "&&": op(5).code((a, b) => a && b),
+  // bitwise OR / XOR
+  "|": op(6).code((a, b) => a | b),
+  "^": op(6).code((a, b) => a ^ b),
+  // comparison
+  "==": op(7).code((a, b) => a == b),
+  ">=": op(7).code((a, b) => a >= b),
+  ">": op(7).code((a, b) => a > b),
+  "<=": op(7).code((a, b) => a <= b),
+  "<": op(7).code((a, b) => a < b),
+  "!=": op(7).code((a, b) => a != b),
+  // pipe
+  "|>": op(8),
+  // conditional in 2 parts (treated as binary and postprocessed for simplicity)
+  // colon is also used for keyword arguments
+  ":": op(9),
+  "?": op(10),
+  // assignment operator (no overloads and handles specially, just here so it can be parsed in the right spot)
+  "=": op(11),
+  // mapping operator (for inside lists)
+  "=>": op(12),
+  // define operator (handled specially)
+  ":-": op(12),
+  // statement separator
+  ",": op(13).code((_, b) => b),
+  ";": op(13)
+};
+var OP_REGEX = new RegExp(`^(${Object.keys(OPERATORS).sort((a, b) => b.length - a.length).map((e) => e.replaceAll(/([()[\]{}*+?|^$\\.])/g, "\\$1")).join("|")})`);
+function getPrecedence(token, unary) {
+  return OPERATORS[token][unary ? "u" : "b"] ?? INVALID;
+}
+__name(getPrecedence, "getPrecedence");
+function getPrecedenceAndCheckValidity(token, isUnary) {
+  const keyOperator = token.a ? "=" : token.t;
+  const realOperator = token.t + (token.a ? "=" : "");
+  const mePrecedence = getPrecedence(keyOperator, isUnary);
+  if (mePrecedence === INVALID) {
+    throw new ParseError(`${str(realOperator)} is not valid as a ${["binary", "unary"][+isUnary]} operator`, token.s);
+  }
+  return mePrecedence;
+}
+__name(getPrecedenceAndCheckValidity, "getPrecedenceAndCheckValidity");
+function isRightAssociative(token) {
+  return OPERATORS[token].r;
+}
+__name(isRightAssociative, "isRightAssociative");
+
+// src/compiler/prog.ts
+function allocRegister(name, state) {
+  const i = state.r.indexOf(name);
+  if (i === -1) return state.r.push(name) - 1;
+  return i;
+}
+__name(allocRegister, "allocRegister");
+function allocNode(name, state) {
+  return state.nn.push(name) - 1;
+}
+__name(allocNode, "allocNode");
 
 // src/compiler/ast.ts
 var Node = class {
@@ -241,7 +441,7 @@ var Value = class extends Leaf {
     return state;
   }
 };
-var Symbol = class extends Leaf {
+var Symbol2 = class extends Leaf {
   constructor(trace, value) {
     super(trace);
     this.value = value;
@@ -519,9 +719,9 @@ var Template = class _Template extends NotCodeNode {
   }
 };
 var BinaryOp = class _BinaryOp extends Node {
-  constructor(trace, op, left, right, noLift = false, assign) {
+  constructor(trace, op2, left, right, noLift = false, assign) {
     super(trace);
-    this.op = op;
+    this.op = op2;
     this.left = left;
     this.right = right;
     this.noLift = noLift;
@@ -559,7 +759,7 @@ var BinaryOp = class _BinaryOp extends Node {
     if ((fn = OPERATORS[this.op]?.cb) && imm) {
       return List.fromImmediate(this.loc, fn(a, b));
     }
-    if (isinstance(left, Symbol) && isinstance(right, Symbol) && /^[!=]=$/.test(this.op)) {
+    if (isinstance(left, Symbol2) && isinstance(right, Symbol2) && /^[!=]=$/.test(this.op)) {
       return List.fromImmediate(this.loc, fn(left.value, b.value));
     }
     return new _BinaryOp(this.loc, this.op, left, right);
@@ -572,9 +772,9 @@ var BinaryOp = class _BinaryOp extends Node {
   }
 };
 var UnaryOp = class _UnaryOp extends Node {
-  constructor(trace, op, value) {
+  constructor(trace, op2, value) {
     super(trace);
-    this.op = op;
+    this.op = op2;
     this.value = value;
   }
   static {
@@ -657,7 +857,7 @@ var Mapping = class _Mapping extends NotCodeNode {
   async toJS(state) {
     const out = {};
     for (var { key, val } of this.mapping) {
-      if (!isinstance(key, Symbol)) {
+      if (!isinstance(key, Symbol2)) {
         throw new Error("unreachable");
       }
       out[key.value] = await val.eval(state);
@@ -900,11 +1100,11 @@ function treeifyExpression(tokens, lift = false) {
       }
     }
     if (bestUnaryIndex >= 0) {
-      const [op, val] = tokens.splice(bestUnaryIndex, 2);
-      tokens.splice(bestUnaryIndex, 0, new UnaryOp(op.s, op.t, val));
+      const [op2, val] = tokens.splice(bestUnaryIndex, 2);
+      tokens.splice(bestUnaryIndex, 0, new UnaryOp(op2.s, op2.t, val));
     } else if (bestBinaryIndex >= 0) {
-      const [left, op, right] = tokens.splice(bestBinaryIndex - 1, 3);
-      const math = new BinaryOp(op.s, op.t, left, right, false, op.a);
+      const [left, op2, right] = tokens.splice(bestBinaryIndex - 1, 3);
+      const math = new BinaryOp(op2.s, op2.t, left, right, false, op2.a);
       tokens.splice(bestBinaryIndex - 1, 0, math);
     } else {
       throw new ParseError("unknown error in expression parsing", firstToken?.s);
@@ -1128,7 +1328,7 @@ var TRANSFORM_PASSES = [
     if (!isinstance(ast.value, Name)) {
       throw new ParseError('unexpected "."', ast.loc);
     }
-    return new Symbol(ast.value.loc, ast.value.name);
+    return new Symbol2(ast.value.loc, ast.value.name);
   }, "expandSymbols"),
   /* @__PURE__ */ __name(async function expandInterpolations(ast) {
     ast = await ast.pipe(expandInterpolations);
@@ -1224,7 +1424,7 @@ var TRANSFORM_PASSES = [
           }
           enums = param.right;
           for (var { key } of enums.mapping) {
-            if (!isinstance(key, Symbol)) {
+            if (!isinstance(key, Symbol2)) {
               throw new ParseError("expected a symbol here", key.edgemost(false).loc, [new ErrorNote(`note: while defining enum options for parameter`, name.loc), ...isinstance(key, Name) ? [new ErrorNote(`hint: put a "." before the ${str(key.name)} to make it a static symbol instead of a variable`, key.loc)] : []]);
             }
           }
@@ -1338,12 +1538,34 @@ function parse(src, filename) {
 __name(parse, "parse");
 
 export {
+  __name,
+  TAU,
+  sin,
+  cos,
+  sgn,
+  abs,
+  tan,
+  saw,
+  tri,
+  noise3,
+  noise5,
+  isNumber,
+  isArray,
+  str,
+  isinstance,
+  LocationTrace,
+  ErrorNote,
+  SydError,
+  ParseError,
+  RuntimeError,
+  CompileError,
+  OPERATORS,
   Node,
   NotCodeNode,
   Leaf,
   AnnotatedValue,
   Value,
-  Symbol,
+  Symbol2 as Symbol,
   Assignment,
   Name,
   Call,
@@ -1365,4 +1587,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-G32GKSBF.js.map
+//# sourceMappingURL=chunk-YGXSPSEX.js.map

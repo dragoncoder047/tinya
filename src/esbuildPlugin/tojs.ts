@@ -1,14 +1,16 @@
 import { readFileSync } from "node:fs";
+import { basename } from "node:path";
 import { parse } from "../compiler";
 import * as AST from "../compiler/ast";
 import { LocationTrace, ParseError } from "../compiler/errors";
 import { isinstance, str } from "../utils";
+import { IncludePlaceholder, processIncludes } from "./include";
 
 const internedStrings = new Map<string, string>();
 var internStringCounter = 0;
-function internString(s: string): string {
+export function internString(s: string): string {
     if (!internedStrings.has(s)) {
-        internedStrings.set(s, "_str" + (internStringCounter++) + s.toLowerCase().replaceAll(/[^\w]/g, ""));
+        internedStrings.set(s, "_str" + (internStringCounter++) + s.toLowerCase().replaceAll(/\W/g, ""));
     }
     return internedStrings.get(s)!;
 }
@@ -85,16 +87,16 @@ function toJS(ast: AST.Node): string {
         return code("ParameterDescriptor", ast, prim(ast.name), toJS(ast.enumOptions), toJS(ast.defaultValue), prim(ast.lazy));
     if (isinstance(ast, AST.Mapping))
         return code("Mapping", ast, liststr(ast.mapping.map(({ key, val }) => `{ key: ${toJS(key)}, val: ${toJS(val)} }`)));
+    if (isinstance(ast, IncludePlaceholder))
+        return ast.varname;
     throw "unreachable";
 }
 
-export async function toJSFile(filename: string, displayFilename: string): Promise<string> {
-    const input = readFileSync(filename, "utf8");
-    const files = { [displayFilename]: input };
-    var ast: AST.Node;
-
+export async function toJSFile(filename: string): Promise<string> {
+    var includeOrder: string[], modules: Record<string, AST.Node>;
+    const files: Record<string, string> = {};
     try {
-        ast = await parse(input, displayFilename);
+        [includeOrder, modules] = await processIncludes(filename, files);
     } catch (e) {
         if (!isinstance(e, ParseError)) throw e;
         console.error(e.displayOn(files));
@@ -103,15 +105,19 @@ export async function toJSFile(filename: string, displayFilename: string): Promi
     internStringCounter = 0;
     internedStrings.clear();
     neededNames.clear();
-    const js = toJS(ast);
     neededNames.add("LocationTrace");
+    const js = includeOrder.map(m => `const ${m} = ${toJS(modules[m]!)}`).join("\n\n");
     return `import { ${[...neededNames.values()].join(", ")} } from "syd";
 
-export const source = /* @__PURE__ */ ${str(input.split("\n"), null, 4)}.join("\\n");
+export const sources = /* @__PURE__ */ {
+    ${Object.entries(files).map(([name, source]) => str(name) + ":\n" + indent(str(source.split("\n"), null, 4))).join(",\n    ")}
+};
 
 ${getInternedStrings()}
 
-export const ast = ${js};
+${js}
+
+export const ast = ${includeOrder.at(-1)};
 
 export default ast;
 `;
