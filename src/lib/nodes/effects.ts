@@ -29,10 +29,10 @@ export const zzfxFilterHelp: NodeHelp = {
         cutoff: {
             range: [-10000, 10000],
             unit: "Hz",
-            description: "The cutoff frequency of the filter. The sign decides between low-pass (>=0) and high-pass (<0) and the magnitude is the cutoff frequency."
+            description: "The cutoff frequency of the filter. The sign decides between high-pass (>=0) and low-pass (<0) and the magnitude is the cutoff frequency."
         },
         quality: {
-            range: [0, 2],
+            range: [0, 100],
             description: "Affects the resonance of the filter."
         }
     }

@@ -376,10 +376,10 @@ var zzfxFilterHelp = {
     cutoff: {
       range: [-1e4, 1e4],
       unit: "Hz",
-      description: "The cutoff frequency of the filter. The sign decides between low-pass (>=0) and high-pass (<0) and the magnitude is the cutoff frequency."
+      description: "The cutoff frequency of the filter. The sign decides between high-pass (>=0) and low-pass (<0) and the magnitude is the cutoff frequency."
     },
     quality: {
-      range: [0, 2],
+      range: [0, 100],
       description: "Affects the resonance of the filter."
     }
   }
@@ -765,4 +765,4 @@ export {
   disassemble,
   initWorklet
 };
-//# sourceMappingURL=chunk-ORYACBB6.js.map
+//# sourceMappingURL=chunk-BVO774BH.js.map
