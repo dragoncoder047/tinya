@@ -26,7 +26,7 @@ import {
   str,
   tan,
   tri
-} from "./chunk-HMJMCDWR.js";
+} from "./chunk-HB3HG7EN.js";
 
 // src/lib/index.syd
 var sources = {
@@ -705,19 +705,15 @@ __name(makeSynthProxy, "makeSynthProxy");
 function disassemble(data) {
   const outLines = [];
   const prog = data.p;
-  var pc = 0;
-  const next = /* @__PURE__ */ __name(() => prog[pc++], "next");
-  const nNode = /* @__PURE__ */ __name(() => {
-    const number = next();
+  const nNode = /* @__PURE__ */ __name((number) => {
     return `${number} (${data.nn[number]})`;
   }, "nNode");
-  while (pc < prog.length) {
-    const code = next();
-    const opName = Opcode[code];
+  for (var command of prog) {
+    const opName = Opcode[command[0]];
     var arg = [];
-    switch (code) {
+    switch (command[0]) {
       case 0 /* PUSH_CONSTANT */:
-        arg = [str(next())];
+        arg = [str(command[1])];
         break;
       case 1 /* PUSH_INPUT_SAMPLES */:
       case 2 /* PUSH_PITCH */:
@@ -733,22 +729,22 @@ function disassemble(data) {
       case 11 /* DO_UNARY_OP */:
       case 12 /* GET_REGISTER */:
       case 13 /* TAP_REGISTER */:
-        arg = [str(next())];
+        arg = [str(command[1])];
         break;
       case 14 /* CONDITIONAL_SELECT */:
       case 15 /* STEREO_DOUBLE_WIDEN */:
         break;
       case 16 /* APPLY_NODE */:
-        arg = [nNode(), str(next()) + " args"];
+        arg = [nNode(command[1]), str(command[2]) + " args"];
         break;
       case 18 /* GET_MOD */:
-        arg = [str(next())];
+        arg = [str(command[1])];
         break;
       case 17 /* APPLY_DOUBLE_NODE_STEREO */:
-        arg = [nNode(), nNode(), str(next()) + " args"];
+        arg = [nNode(command[1]), nNode(command[2]), str(command[1]) + " args"];
         break;
       default:
-        code;
+        command[0];
     }
     outLines.push(`${opName} ${arg.join(", ")}`);
   }
@@ -778,4 +774,4 @@ export {
   disassemble,
   initWorklet
 };
-//# sourceMappingURL=chunk-YO3MNY3H.js.map
+//# sourceMappingURL=chunk-6LS5Z76T.js.map

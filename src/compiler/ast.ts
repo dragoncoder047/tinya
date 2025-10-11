@@ -64,7 +64,7 @@ export class Value extends Leaf {
         return this;
     }
     compile(state: CompiledVoiceData) {
-        state.p.push(Opcode.PUSH_CONSTANT, this.value);
+        state.p.push([Opcode.PUSH_CONSTANT, this.value]);
         state.tosStereo = false;
         return state;
     }
@@ -96,7 +96,7 @@ export class Assignment extends Node {
     }
     compile(state: CompiledVoiceData, ni: NodeDef[]) {
         this.value.compile(state, ni);
-        state.p.push(Opcode.TAP_REGISTER, allocRegister((this.target as any).name, state));
+        state.p.push([Opcode.TAP_REGISTER, allocRegister((this.target as any).name, state)]);
         return state;
     }
 }
@@ -111,7 +111,7 @@ export class Name extends Leaf {
         return val;
     }
     compile(state: CompiledVoiceData) {
-        state.p.push(Opcode.GET_REGISTER, allocRegister(this.name, state));
+        state.p.push([Opcode.GET_REGISTER, allocRegister(this.name, state)]);
         return state;
     }
 }
@@ -157,7 +157,7 @@ export class Call extends Node {
             argProgs.push([state.p, state.tosStereo ? NodeValueType.STEREO : NodeValueType.NORMAL_OR_MONO]);
         }
         state.p = existingProg;
-        const callProg: Program = [Opcode.APPLY_NODE, allocNode(this.name, state), nodeImpl[1].length];
+        const callProg: Program[number] = [Opcode.APPLY_NODE, allocNode(this.name, state), nodeImpl[1].length];
         // logic for stereo/mono nodes:
         // if the node is x -> stereo, the inputs must all be the right type (mono to stereo can be widened; stereo to mono can't be narrowed, error)
         // if the node is mono -> mono, the node itself is duplicated if any inputs are stereo and the output is stereo, else mono
@@ -170,7 +170,7 @@ export class Call extends Node {
             for (i = 0; i < nodeImpl[1].length; i++) {
                 const gottenArgType = argProgs[i]![1];
                 if (gottenArgType !== NodeValueType.STEREO) {
-                    argProgs[i]![0].push(Opcode.STEREO_DOUBLE_WIDEN);
+                    argProgs[i]![0].push([Opcode.STEREO_DOUBLE_WIDEN]);
                 }
             }
             state.tosStereo = true;
@@ -184,7 +184,7 @@ export class Call extends Node {
                 if (neededArgType !== NodeValueType.STEREO && gottenArgType === NodeValueType.STEREO) {
                     throw new CompileError("cannot implicitly convert stereo output to mono", this.args[i]!.loc);
                 } else if (neededArgType === NodeValueType.STEREO && gottenArgType !== NodeValueType.STEREO) {
-                    argProgs[i]![0].push(Opcode.STEREO_DOUBLE_WIDEN);
+                    argProgs[i]![0].push([Opcode.STEREO_DOUBLE_WIDEN]);
                 }
             }
             state.tosStereo = nodeImpl[2] === NodeValueType.STEREO;
@@ -192,7 +192,7 @@ export class Call extends Node {
         for (i = 0; i < this.args.length; i++) {
             state.p.push(...argProgs[i]![0]);
         }
-        state.p.push(...callProg);
+        state.p.push(callProg);
         return state;
     }
 }
@@ -233,16 +233,16 @@ export class List extends Node {
     compile(state: CompiledVoiceData, ni: NodeDef[]) {
         if (this.isImmediate()) {
             const imm = this.toImmediate() as any;
-            state.p.push(Opcode.PUSH_CONSTANT, imm);
+            state.p.push([Opcode.PUSH_CONSTANT, imm]);
         } else {
-            state.p.push(Opcode.PUSH_FRESH_EMPTY_LIST);
+            state.p.push([Opcode.PUSH_FRESH_EMPTY_LIST]);
             for (var arg of this.values) {
                 if (isinstance(arg, SplatValue)) {
                     arg.value.compile(state, ni);
-                    state.p.push(Opcode.EXTEND_TO_LIST);
+                    state.p.push([Opcode.EXTEND_TO_LIST]);
                 } else {
                     arg.compile(state, ni);
-                    state.p.push(Opcode.APPEND_TO_LIST);
+                    state.p.push([Opcode.APPEND_TO_LIST]);
                 }
             }
         }
@@ -334,7 +334,7 @@ export class BinaryOp extends Node {
     compile(state: CompiledVoiceData, ni: NodeDef[]) {
         this.left.compile(state, ni);
         this.right.compile(state, ni);
-        state.p.push(Opcode.DO_BINARY_OP, this.op);
+        state.p.push([Opcode.DO_BINARY_OP, this.op]);
         return state;
     }
 }
@@ -364,7 +364,7 @@ export class UnaryOp extends Node {
     }
     compile(state: CompiledVoiceData, ni: NodeDef[]) {
         this.value.compile(state, ni);
-        state.p.push(Opcode.DO_UNARY_OP, this.op);
+        state.p.push([Opcode.DO_UNARY_OP, this.op]);
         return state;
     }
 }
@@ -430,14 +430,14 @@ export class Conditional extends Node {
         this.caseTrue.compile(state, ni);
         const stereoT = state.tosStereo;
         if ((state.tosStereo ||= stereoF)) {
-            if (!stereoT) state.p.push(Opcode.STEREO_DOUBLE_WIDEN);
-            if (!stereoF) state.p.splice(stereoI, 0, Opcode.STEREO_DOUBLE_WIDEN);
+            if (!stereoT) state.p.push([Opcode.STEREO_DOUBLE_WIDEN]);
+            if (!stereoF) state.p.splice(stereoI, 0, [Opcode.STEREO_DOUBLE_WIDEN]);
         }
         this.cond.compile(state, ni);
         if (state.tosStereo) {
             throw new CompileError("cannot use stereo output as condition", this.cond.loc);
         }
-        state.p.push(Opcode.CONDITIONAL_SELECT);
+        state.p.push([Opcode.CONDITIONAL_SELECT]);
         return state;
     }
 }
@@ -486,7 +486,7 @@ export class Block extends Node {
     compile(state: CompiledVoiceData, ni: NodeDef[]) {
         for (var arg of this.body) {
             arg.compile(state, ni);
-            state.p.push(Opcode.DROP_TOP);
+            state.p.push([Opcode.DROP_TOP]);
         }
         // *Don't* drop the last value
         state.p.pop();

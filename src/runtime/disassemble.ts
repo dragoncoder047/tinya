@@ -4,20 +4,16 @@ import { str } from "../utils";
 export function disassemble(data: CompiledVoiceData): string {
     const outLines: string[] = [];
     const prog = data.p;
-    var pc = 0;
-    const next = () => prog[pc++] as any;
-    const nNode = () => {
-        const number = next() as number;
+    const nNode = (number: number) => {
         return `${number} (${data.nn[number]})`;
     }
 
-    while (pc < prog.length) {
-        const code = next() as Opcode;
-        const opName = Opcode[code];
+    for (var command of prog) {
+        const opName = Opcode[command[0]];
         var arg: string[] = [];
-        switch (code) {
+        switch (command[0]) {
             case Opcode.PUSH_CONSTANT:
-                arg = [str(next())];
+                arg = [str(command[1])];
                 break;
             case Opcode.PUSH_INPUT_SAMPLES:
             case Opcode.PUSH_PITCH:
@@ -33,22 +29,22 @@ export function disassemble(data: CompiledVoiceData): string {
             case Opcode.DO_UNARY_OP:
             case Opcode.GET_REGISTER:
             case Opcode.TAP_REGISTER:
-                arg = [str(next())];
+                arg = [str(command[1])];
                 break;
             case Opcode.CONDITIONAL_SELECT:
             case Opcode.STEREO_DOUBLE_WIDEN:
                 break;
             case Opcode.APPLY_NODE:
-                arg = [nNode(), str(next()) + " args"];
+                arg = [nNode(command[1] as number), str(command[2]) + " args"];
                 break;
             case Opcode.GET_MOD:
-                arg = [str(next())];
+                arg = [str(command[1])];
                 break;
             case Opcode.APPLY_DOUBLE_NODE_STEREO:
-                arg = [nNode(), nNode(), str(next()) + " args"];
+                arg = [nNode(command[1] as number), nNode(command[2] as number), str(command[1]) + " args"];
                 break;
             default:
-                code satisfies never;
+                command[0] satisfies never;
         }
         outLines.push(`${opName} ${arg.join(", ")}`)
     }

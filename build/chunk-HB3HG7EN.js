@@ -469,7 +469,7 @@ var Value = class extends Leaf {
     return this;
   }
   compile(state) {
-    state.p.push(0 /* PUSH_CONSTANT */, this.value);
+    state.p.push([0 /* PUSH_CONSTANT */, this.value]);
     state.tosStereo = false;
     return state;
   }
@@ -516,7 +516,7 @@ var Assignment = class _Assignment extends Node {
   }
   compile(state, ni) {
     this.value.compile(state, ni);
-    state.p.push(13 /* TAP_REGISTER */, allocRegister(this.target.name, state));
+    state.p.push([13 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
     return state;
   }
 };
@@ -536,7 +536,7 @@ var Name = class extends Leaf {
     return val;
   }
   compile(state) {
-    state.p.push(12 /* GET_REGISTER */, allocRegister(this.name, state));
+    state.p.push([12 /* GET_REGISTER */, allocRegister(this.name, state)]);
     return state;
   }
 };
@@ -600,7 +600,7 @@ var Call = class _Call extends Node {
       for (i = 0; i < nodeImpl[1].length; i++) {
         const gottenArgType = argProgs[i][1];
         if (gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push(15 /* STEREO_DOUBLE_WIDEN */);
+          argProgs[i][0].push([15 /* STEREO_DOUBLE_WIDEN */]);
         }
       }
       state.tosStereo = true;
@@ -613,7 +613,7 @@ var Call = class _Call extends Node {
         if (neededArgType !== 1 /* STEREO */ && gottenArgType === 1 /* STEREO */) {
           throw new CompileError("cannot implicitly convert stereo output to mono", this.args[i].loc);
         } else if (neededArgType === 1 /* STEREO */ && gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push(15 /* STEREO_DOUBLE_WIDEN */);
+          argProgs[i][0].push([15 /* STEREO_DOUBLE_WIDEN */]);
         }
       }
       state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
@@ -621,7 +621,7 @@ var Call = class _Call extends Node {
     for (i = 0; i < this.args.length; i++) {
       state.p.push(...argProgs[i][0]);
     }
-    state.p.push(...callProg);
+    state.p.push(callProg);
     return state;
   }
 };
@@ -671,16 +671,16 @@ var List = class _List extends Node {
   compile(state, ni) {
     if (this.isImmediate()) {
       const imm = this.toImmediate();
-      state.p.push(0 /* PUSH_CONSTANT */, imm);
+      state.p.push([0 /* PUSH_CONSTANT */, imm]);
     } else {
-      state.p.push(7 /* PUSH_FRESH_EMPTY_LIST */);
+      state.p.push([7 /* PUSH_FRESH_EMPTY_LIST */]);
       for (var arg of this.values) {
         if (isinstance(arg, SplatValue)) {
           arg.value.compile(state, ni);
-          state.p.push(9 /* EXTEND_TO_LIST */);
+          state.p.push([9 /* EXTEND_TO_LIST */]);
         } else {
           arg.compile(state, ni);
-          state.p.push(8 /* APPEND_TO_LIST */);
+          state.p.push([8 /* APPEND_TO_LIST */]);
         }
       }
     }
@@ -817,7 +817,7 @@ var BinaryOp = class _BinaryOp extends Node {
   compile(state, ni) {
     this.left.compile(state, ni);
     this.right.compile(state, ni);
-    state.p.push(10 /* DO_BINARY_OP */, this.op);
+    state.p.push([10 /* DO_BINARY_OP */, this.op]);
     return state;
   }
 };
@@ -857,7 +857,7 @@ var UnaryOp = class _UnaryOp extends Node {
   }
   compile(state, ni) {
     this.value.compile(state, ni);
-    state.p.push(11 /* DO_UNARY_OP */, this.op);
+    state.p.push([11 /* DO_UNARY_OP */, this.op]);
     return state;
   }
 };
@@ -955,14 +955,14 @@ var Conditional = class _Conditional extends Node {
     this.caseTrue.compile(state, ni);
     const stereoT = state.tosStereo;
     if (state.tosStereo ||= stereoF) {
-      if (!stereoT) state.p.push(15 /* STEREO_DOUBLE_WIDEN */);
-      if (!stereoF) state.p.splice(stereoI, 0, 15 /* STEREO_DOUBLE_WIDEN */);
+      if (!stereoT) state.p.push([15 /* STEREO_DOUBLE_WIDEN */]);
+      if (!stereoF) state.p.splice(stereoI, 0, [15 /* STEREO_DOUBLE_WIDEN */]);
     }
     this.cond.compile(state, ni);
     if (state.tosStereo) {
       throw new CompileError("cannot use stereo output as condition", this.cond.loc);
     }
-    state.p.push(14 /* CONDITIONAL_SELECT */);
+    state.p.push([14 /* CONDITIONAL_SELECT */]);
     return state;
   }
 };
@@ -1040,7 +1040,7 @@ var Block = class _Block extends Node {
   compile(state, ni) {
     for (var arg of this.body) {
       arg.compile(state, ni);
-      state.p.push(6 /* DROP_TOP */);
+      state.p.push([6 /* DROP_TOP */]);
     }
     state.p.pop();
     return state;
@@ -1668,4 +1668,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-HMJMCDWR.js.map
+//# sourceMappingURL=chunk-HB3HG7EN.js.map

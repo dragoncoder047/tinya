@@ -60,16 +60,16 @@ export class Tone {
         const push = (x: any) => stack.push(x);//(stack[sp] = x, sp++);
         const pop = () => stack.pop();//(sp--, stack[sp]);
         const peek = () => stack.at(-1);//stack[sp - 1];
-        const next = () => prog[pc++] as number;
 
-        var pc: number, sp: number, a, b, c, i;
-        stack.length = args.length = argsL.length = argsR.length = pc = sp = 0;
+        var sp: number, a, b, c, i;
+        stack.length = args.length = argsL.length = argsR.length = sp = 0;
 
-        while (pc < prog.length) {
-            const code = next() as Opcode;
-            switch (code) {
+        for (var pc = 0; pc < prog.length; pc++) {
+            const code = prog[pc]!;
+            const op = code[0];
+            switch (op) {
                 case Opcode.PUSH_CONSTANT:
-                    push(next());
+                    push(code[1]);
                     break;
                 case Opcode.PUSH_INPUT_SAMPLES:
                     tmp.length = 2;
@@ -106,17 +106,17 @@ export class Tone {
                 case Opcode.DO_BINARY_OP:
                     b = pop();
                     a = pop();
-                    push(OPERATORS[next()]!.cb!(a, b));
+                    push(OPERATORS[code[1] as string]!.cb!(a, b));
                     break;
                 case Opcode.DO_UNARY_OP:
                     a = pop();
-                    push(OPERATORS[next()]!.cu!(a));
+                    push(OPERATORS[code[1] as string]!.cu!(a));
                     break;
                 case Opcode.GET_REGISTER:
-                    push(registers[next()]);
+                    push(registers[code[1] as number]);
                     break;
                 case Opcode.TAP_REGISTER:
-                    registers[next()] = peek();
+                    registers[code[1] as number] = peek();
                     break;
                 case Opcode.CONDITIONAL_SELECT:
                     c = pop();
@@ -129,8 +129,8 @@ export class Tone {
                     push([a, a]);
                     break;
                 case Opcode.APPLY_NODE:
-                    a = next();
-                    i = args.length = next();
+                    a = code[1] as number;
+                    i = args.length = code[2] as number;
                     while (i > 0) {
                         i--;
                         args[i] = pop();
@@ -138,12 +138,12 @@ export class Tone {
                     push(nodes[a]!(this.dt, args));
                     break;
                 case Opcode.GET_MOD:
-                    push(this.mods[next()]?.value ?? 0);
+                    push(this.mods[code[1] as number]?.value ?? 0);
                     break;
                 case Opcode.APPLY_DOUBLE_NODE_STEREO:
-                    a = next();
-                    b = next();
-                    i = args.length = argsL.length = argsR.length = c = next();
+                    a = code[1] as number;
+                    b = code[2] as number;
+                    i = args.length = argsL.length = argsR.length = c = code[3] as number;
                     while (i > 0) {
                         i--;
                         args[i] = pop();
@@ -160,7 +160,7 @@ export class Tone {
                     push([nodes[a]!(this.dt, argsL), nodes[b]!(this.dt, argsR)]);
                     break;
                 default:
-                    code satisfies never;
+                    op satisfies never;
             }
         }
         a = pop();

@@ -1,13 +1,13 @@
 import {
   nodes,
   passthroughFx
-} from "./chunk-YO3MNY3H.js";
+} from "./chunk-6LS5Z76T.js";
 import {
   OPERATORS,
   __name,
   isArray,
   isNumber
-} from "./chunk-HMJMCDWR.js";
+} from "./chunk-HB3HG7EN.js";
 
 // src/runtime/automation.ts
 var AutomatedValue = class {
@@ -96,14 +96,14 @@ var Tone = class {
     const push = /* @__PURE__ */ __name((x) => stack.push(x), "push");
     const pop = /* @__PURE__ */ __name(() => stack.pop(), "pop");
     const peek = /* @__PURE__ */ __name(() => stack.at(-1), "peek");
-    const next = /* @__PURE__ */ __name(() => prog[pc++], "next");
-    var pc, sp, a, b, c, i;
-    stack.length = args.length = argsL.length = argsR.length = pc = sp = 0;
-    while (pc < prog.length) {
-      const code = next();
-      switch (code) {
+    var sp, a, b, c, i;
+    stack.length = args.length = argsL.length = argsR.length = sp = 0;
+    for (var pc = 0; pc < prog.length; pc++) {
+      const code = prog[pc];
+      const op = code[0];
+      switch (op) {
         case 0 /* PUSH_CONSTANT */:
-          push(next());
+          push(code[1]);
           break;
         case 1 /* PUSH_INPUT_SAMPLES */:
           tmp.length = 2;
@@ -140,17 +140,17 @@ var Tone = class {
         case 10 /* DO_BINARY_OP */:
           b = pop();
           a = pop();
-          push(OPERATORS[next()].cb(a, b));
+          push(OPERATORS[code[1]].cb(a, b));
           break;
         case 11 /* DO_UNARY_OP */:
           a = pop();
-          push(OPERATORS[next()].cu(a));
+          push(OPERATORS[code[1]].cu(a));
           break;
         case 12 /* GET_REGISTER */:
-          push(registers[next()]);
+          push(registers[code[1]]);
           break;
         case 13 /* TAP_REGISTER */:
-          registers[next()] = peek();
+          registers[code[1]] = peek();
           break;
         case 14 /* CONDITIONAL_SELECT */:
           c = pop();
@@ -163,8 +163,8 @@ var Tone = class {
           push([a, a]);
           break;
         case 16 /* APPLY_NODE */:
-          a = next();
-          i = args.length = next();
+          a = code[1];
+          i = args.length = code[2];
           while (i > 0) {
             i--;
             args[i] = pop();
@@ -172,12 +172,12 @@ var Tone = class {
           push(nodes2[a](this.dt, args));
           break;
         case 18 /* GET_MOD */:
-          push(this.mods[next()]?.value ?? 0);
+          push(this.mods[code[1]]?.value ?? 0);
           break;
         case 17 /* APPLY_DOUBLE_NODE_STEREO */:
-          a = next();
-          b = next();
-          i = args.length = argsL.length = argsR.length = c = next();
+          a = code[1];
+          b = code[2];
+          i = args.length = argsL.length = argsR.length = c = code[3];
           while (i > 0) {
             i--;
             args[i] = pop();
@@ -194,7 +194,7 @@ var Tone = class {
           push([nodes2[a](this.dt, argsL), nodes2[b](this.dt, argsR)]);
           break;
         default:
-          code;
+          op;
       }
     }
     a = pop();

@@ -31,7 +31,8 @@ export enum Opcode {
     GET_MOD,
 }
 
-export type Program = (Opcode | number | string | [number, number])[];
+type Command = [Opcode, a?: number | string | [number, number], b?: number, c?: number];
+export type Program = Command[];
 
 export interface CompiledVoiceData {
     p: Program;
