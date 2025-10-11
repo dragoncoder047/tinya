@@ -7,7 +7,6 @@ import { OPERATORS } from "./operator";
 import { allocNode, allocRegister, CompiledVoiceData, Opcode, Program } from "./prog";
 
 export abstract class Node {
-    hasNodes = false;
     constructor(public loc: LocationTrace) { }
     abstract edgemost(left: boolean): Node;
     abstract pipe(fn: (node: Node) => Promise<Node>): Promise<Node>;
@@ -16,7 +15,7 @@ export abstract class Node {
 }
 
 export abstract class NotCodeNode extends Node {
-    compile(state: CompiledVoiceData) {
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         throw new CompileError("how did we get here ?!? (" + this.constructor.name + ")", this.loc);
     }
 }
@@ -33,7 +32,6 @@ export class AnnotatedValue extends NotCodeNode {
     edgemost(left: boolean): Node { return left ? (this.attributes.length > 0 ? this.attributes[0]!.edgemost(left) : this) : (this.value ?? this); }
     async eval(state: EvalState) {
         var v = this.value;
-        var anyHas = false;
         for (var attr of this.attributes) {
             var args: Node[] | null = null;
             var name: string;
@@ -47,12 +45,10 @@ export class AnnotatedValue extends NotCodeNode {
                     args = attr.args;
                 }
                 v = await impl(v, args, state);
-                if (v.hasNodes) anyHas = true;
             } else {
                 throw new RuntimeError("illegal annotation", attr.loc, stackToNotes(state.callstack));
             }
         }
-        if (v && anyHas) return withHasCode(v!);
         return v!;
     }
 }
@@ -85,13 +81,17 @@ export class Assignment extends Node {
             throw new RuntimeError("cannot assign to this", this.target.loc);
         }
         const name = this.target.name;
-        const scope = Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
-        scope[name] = new LateBinding(this.loc, name);
-        const val = scope[name] = await this.value.eval(state);
-        if (val.hasNodes) {
-            return withHasCode(new Assignment(this.loc, this.target, val));
+        const scope = scopeForName(name, state);
+        var b = scope[name];
+        if (!b) {
+            b = new LateBinding(this.loc, name);
+            scope[name] = b;
         }
-        return val;
+        const result = scope[name] = await this.value.eval(state);
+        if (isinstance(b, LateBinding)) {
+            b.boundValue = result;
+        }
+        return result;
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         compileNode(this.value, state, refMap, ni);
@@ -104,18 +104,25 @@ export class Name extends Leaf {
     async eval(state: EvalState) {
         const val = state.env[this.name];
         if (!val) {
-            throw new RuntimeError("undefined: " + this.name, this.loc, stackToNotes(state.callstack));
+            return scopeForName(this.name, state)[this.name] = new LateBinding(this.loc, this.name);
         }
         return val;
     }
-    compile(state: CompiledVoiceData) {
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         state.p.push([Opcode.GET_REGISTER, allocRegister(this.name, state)]);
     }
 }
 
-class LateBinding extends Name {
-    async eval(state: EvalState) {
-        return withHasCode(this);
+export class LateBinding extends Name {
+    boundValue: Node | undefined = undefined;
+    async eval() {
+        return this.boundValue ?? this;
+    }
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+        if (!this.boundValue) {
+            throw new CompileError(`${this.name} was never assigned to in this scope`, this.loc);
+        }
+        compileNode(this.boundValue, state, refMap, ni);
     }
 }
 
@@ -138,7 +145,7 @@ export class Call extends Node {
         if (nodeImpl[2] === NodeValueType.DECOUPLED_MATH && (x = new List(this.loc, this.args)).isImmediate()) {
             return new Value(this.loc, nodeImpl[4]!(null as any)(null!, x.toImmediate()!));
         }
-        return withHasCode(new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl)));
+        return new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl));
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         var i: number;
@@ -199,18 +206,15 @@ export class List extends Node {
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new List(this.loc, await asyncNodePipe(this.values, fn)); }
     async eval(state: EvalState) {
         const values: Node[] = [];
-        var anyHas = false;
         for (var v of this.values) {
             const v2 = await v.eval(state);
-            if (v2.hasNodes) anyHas = true;
             if (isinstance(v2, SplatValue) && isinstance(v2.value, List)) {
                 values.push(...v2.value.values);
             } else {
                 values.push(v2);
             }
         }
-        const res = new List(this.loc, values);
-        return anyHas ? withHasCode(res) : res;
+        return new List(this.loc, values);
     }
     hasSplats() {
         return this.values.some(v => isinstance(v, SplatValue));
@@ -322,8 +326,7 @@ export class BinaryOp extends Node {
         if (isinstance(left, Symbol) && isinstance(right, Symbol) && /^[!=]=$/.test(this.op)) {
             return List.fromImmediate(this.loc, fn!(left.value, b.value));
         }
-        const out = new BinaryOp(this.loc, this.op, left, right);
-        return (left.hasNodes || right.hasNodes) ? withHasCode(out) : out;
+        return new BinaryOp(this.loc, this.op, left, right);
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         compileNode(this.left, state, refMap, ni);
@@ -359,8 +362,7 @@ export class UnaryOp extends Node {
         if (imm && (fn = OPERATORS[this.op]?.cu)) {
             return List.fromImmediate(this.loc, fn(value));
         }
-        const out = new UnaryOp(this.loc, this.op, val);
-        return val.hasNodes ? withHasCode(out) : out;
+        return new UnaryOp(this.loc, this.op, val);
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         compileNode(this.value, state, refMap, ni);
@@ -379,9 +381,7 @@ export class KeywordArgument extends NotCodeNode {
     edgemost(left: boolean): Node { return left ? this : this.arg.edgemost(left); }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new KeywordArgument(this.loc, this.name, await fn(this.arg)); }
     async eval(state: EvalState) {
-        const a = await this.arg.eval(state);
-        const out = new KeywordArgument(this.loc, this.name, a);
-        return a.hasNodes ? withHasCode(out) : out;
+        return new KeywordArgument(this.loc, this.name, await this.arg.eval(state));
     }
 }
 
@@ -390,10 +390,7 @@ export class Mapping extends NotCodeNode {
     edgemost(left: boolean): Node { return this.mapping.length > 0 ? left ? this.mapping[0]!.key.edgemost(left) : this.mapping.at(-1)!.val.edgemost(left) : this; }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) }))); }
     async eval(state: EvalState) {
-        const pairs = await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) })));
-        var anyHas = pairs.some(p => p.key.hasNodes || p.val.hasNodes);
-        const out = new Mapping(this.loc, pairs);
-        return anyHas ? withHasCode(out) : out;
+        return new Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) }))));
     }
     async toJS(state: EvalState): Promise<Record<string, Node>> {
         const out: Record<string, Node> = {};
@@ -418,9 +415,7 @@ export class Conditional extends Node {
         }
         const ct = await this.caseTrue.eval(state);
         const cf = await this.caseFalse.eval(state);
-        var anyHas = cond.hasNodes || ct.hasNodes || cf.hasNodes;
-        const out = new Conditional(this.loc, cond, ct, cf);
-        return anyHas ? withHasCode(out) : out;
+        return new Conditional(this.loc, cond, ct, cf);
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         compileNode(this.caseFalse, state, refMap, ni);
@@ -454,9 +449,7 @@ export class SplatValue extends NotCodeNode {
     edgemost(left: boolean): Node { return this.value.edgemost(left); }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new SplatValue(this.loc, await fn(this.value)); }
     async eval(state: EvalState) {
-        const v = await this.value.eval(state);
-        const out = new SplatValue(this.loc, v);
-        return v.hasNodes ? withHasCode(out) : out;
+        return new SplatValue(this.loc, await this.value.eval(state));
     }
 }
 
@@ -472,13 +465,10 @@ export class Block extends Node {
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Block(this.loc, await asyncNodePipe(this.body, fn)); }
     async eval(state: EvalState): Promise<Node> {
         var last: Node = new Value(this.loc, undefined);
-        const hadNodes: Node[] = [];
         for (var v of this.body) {
             if (isinstance(v, DefaultPlaceholder)) last = new Value(v.loc, undefined);
             else last = await v.eval(state);
-            if (last.hasNodes) hadNodes.push(last);
         }
-        if (hadNodes.length > 0) return withHasCode(new Block(this.loc, hadNodes));
         return last;
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
@@ -493,10 +483,6 @@ export class Block extends Node {
 
 async function asyncNodePipe<T>(nodes: T[], fn: (node: T) => Promise<T>): Promise<T[]> {
     return await Promise.all(nodes.map(fn));
-}
-function withHasCode<T extends Node>(node: T): T {
-    node.hasNodes = true;
-    return node;
 }
 
 export function stackToNotes(stack: Call[]): ErrorNote[] {
@@ -517,6 +503,10 @@ export function newCompileData(): CompiledVoiceData {
     }
 }
 
+function scopeForName(name: string, state: EvalState) {
+    return Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
+}
+
 type ResultCacheEntry = [
     used: boolean, // whether this node is reffed multiple times
     index: number | null, // index into prog to insert tap - defined if node is completed and tap must be spliced in
@@ -524,20 +514,17 @@ type ResultCacheEntry = [
 ];
 
 export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
-    if (isinstance(node, Leaf)) {
+    if (isinstance(node, Value)) {
         node.compile(state);
         return;
     }
     const entry = cache.get(node);
     const regname = "" + id(node);
-    console.group(node, regname);
     if (entry) {
         if (!entry[0]) {
             entry[0] = true;
             // haven't assigned a tap yet
-            console.log("--> no tap");
             if (entry[1] !== null) {
-                console.log("  -->> diamond reference")
                 // ... but the node has been compiled in fully
                 state.p.splice(entry[1], 0, [Opcode.TAP_REGISTER, allocRegister(regname, state)]);
                 // update nodes further down the line after this in the program
@@ -545,12 +532,10 @@ export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Nod
                     if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
                 }
             } else {
-                console.log("  -->> backreference")
                 // node has NOT been compiled in fully so tap point doesn't exist yet - this is a backreference!
                 // we don't need to adjust any indices
             }
         } else {
-            console.log("  -->> another reference")
             // node's tap has been handled already or will be handled
         }
         state.p.push([Opcode.GET_REGISTER, allocRegister(regname, state)]);
@@ -564,11 +549,9 @@ export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Nod
         node.compile(state, cache, ni);
         // Tap out if needed
         if (myEntry[0]) {
-            console.log("  -->> was backreffed");
             state.p.push([Opcode.TAP_REGISTER, allocRegister(regname, state)]);
         }
         myEntry[1] = state.p.length;
     }
-    console.groupEnd();
     return state;
 }

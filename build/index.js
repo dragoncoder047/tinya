@@ -8,7 +8,7 @@ import {
   nodeHelp,
   nodes,
   sources
-} from "./chunk-MOFQH45R.js";
+} from "./chunk-J2FQLSRR.js";
 import {
   AnnotatedValue,
   Assignment,
@@ -22,6 +22,7 @@ import {
   ErrorNote,
   InterpolatedValue,
   KeywordArgument,
+  LateBinding,
   Leaf,
   List,
   LocationTrace,
@@ -44,7 +45,7 @@ import {
   newCompileData,
   parse,
   stackToNotes
-} from "./chunk-OLQY34MG.js";
+} from "./chunk-KJLP6I25.js";
 export {
   ast_exports as AST,
   AnnotatedValue,
@@ -59,6 +60,7 @@ export {
   ErrorNote,
   InterpolatedValue,
   KeywordArgument,
+  LateBinding,
   Leaf,
   List,
   LocationTrace,

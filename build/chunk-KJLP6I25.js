@@ -83,6 +83,7 @@ __export(ast_exports, {
   Definition: () => Definition,
   InterpolatedValue: () => InterpolatedValue,
   KeywordArgument: () => KeywordArgument,
+  LateBinding: () => LateBinding,
   Leaf: () => Leaf,
   List: () => List,
   Mapping: () => Mapping,
@@ -400,13 +401,12 @@ var Node = class {
   static {
     __name(this, "Node");
   }
-  hasNodes = false;
 };
 var NotCodeNode = class extends Node {
   static {
     __name(this, "NotCodeNode");
   }
-  compile(state) {
+  compile(state, refMap, ni) {
     throw new CompileError("how did we get here ?!? (" + this.constructor.name + ")", this.loc);
   }
 };
@@ -441,7 +441,6 @@ var AnnotatedValue = class _AnnotatedValue extends NotCodeNode {
   }
   async eval(state) {
     var v = this.value;
-    var anyHas = false;
     for (var attr of this.attributes) {
       var args = null;
       var name;
@@ -455,12 +454,10 @@ var AnnotatedValue = class _AnnotatedValue extends NotCodeNode {
           args = attr.args;
         }
         v = await impl(v, args, state);
-        if (v.hasNodes) anyHas = true;
       } else {
         throw new RuntimeError("illegal annotation", attr.loc, stackToNotes(state.callstack));
       }
     }
-    if (v && anyHas) return withHasCode(v);
     return v;
   }
 };
@@ -513,13 +510,17 @@ var Assignment = class _Assignment extends Node {
       throw new RuntimeError("cannot assign to this", this.target.loc);
     }
     const name = this.target.name;
-    const scope = Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
-    scope[name] = new LateBinding(this.loc, name);
-    const val = scope[name] = await this.value.eval(state);
-    if (val.hasNodes) {
-      return withHasCode(new _Assignment(this.loc, this.target, val));
+    const scope = scopeForName(name, state);
+    var b = scope[name];
+    if (!b) {
+      b = new LateBinding(this.loc, name);
+      scope[name] = b;
     }
-    return val;
+    const result = scope[name] = await this.value.eval(state);
+    if (isinstance(b, LateBinding)) {
+      b.boundValue = result;
+    }
+    return result;
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
@@ -537,11 +538,11 @@ var Name = class extends Leaf {
   async eval(state) {
     const val = state.env[this.name];
     if (!val) {
-      throw new RuntimeError("undefined: " + this.name, this.loc, stackToNotes(state.callstack));
+      return scopeForName(this.name, state)[this.name] = new LateBinding(this.loc, this.name);
     }
     return val;
   }
-  compile(state) {
+  compile(state, refMap, ni) {
     state.p.push([14 /* GET_REGISTER */, allocRegister(this.name, state)]);
   }
 };
@@ -549,8 +550,15 @@ var LateBinding = class extends Name {
   static {
     __name(this, "LateBinding");
   }
-  async eval(state) {
-    return withHasCode(this);
+  boundValue = void 0;
+  async eval() {
+    return this.boundValue ?? this;
+  }
+  compile(state, refMap, ni) {
+    if (!this.boundValue) {
+      throw new CompileError(`${this.name} was never assigned to in this scope`, this.loc);
+    }
+    compileNode(this.boundValue, state, refMap, ni);
   }
 };
 var Call = class _Call extends Node {
@@ -583,7 +591,7 @@ var Call = class _Call extends Node {
     if (nodeImpl[2] === 2 /* DECOUPLED_MATH */ && (x = new List(this.loc, this.args)).isImmediate()) {
       return new Value(this.loc, nodeImpl[4](null)(null, x.toImmediate()));
     }
-    return withHasCode(new _Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl)));
+    return new _Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl));
   }
   compile(state, refMap, ni) {
     var i;
@@ -645,18 +653,15 @@ var List = class _List extends Node {
   }
   async eval(state) {
     const values = [];
-    var anyHas = false;
     for (var v of this.values) {
       const v2 = await v.eval(state);
-      if (v2.hasNodes) anyHas = true;
       if (isinstance(v2, SplatValue) && isinstance(v2.value, _List)) {
         values.push(...v2.value.values);
       } else {
         values.push(v2);
       }
     }
-    const res = new _List(this.loc, values);
-    return anyHas ? withHasCode(res) : res;
+    return new _List(this.loc, values);
   }
   hasSplats() {
     return this.values.some((v) => isinstance(v, SplatValue));
@@ -813,8 +818,7 @@ var BinaryOp = class _BinaryOp extends Node {
     if (isinstance(left, Symbol2) && isinstance(right, Symbol2) && /^[!=]=$/.test(this.op)) {
       return List.fromImmediate(this.loc, fn(left.value, b.value));
     }
-    const out = new _BinaryOp(this.loc, this.op, left, right);
-    return left.hasNodes || right.hasNodes ? withHasCode(out) : out;
+    return new _BinaryOp(this.loc, this.op, left, right);
   }
   compile(state, refMap, ni) {
     compileNode(this.left, state, refMap, ni);
@@ -860,8 +864,7 @@ var UnaryOp = class _UnaryOp extends Node {
     if (imm && (fn = OPERATORS[this.op]?.cu)) {
       return List.fromImmediate(this.loc, fn(value));
     }
-    const out = new _UnaryOp(this.loc, this.op, val);
-    return val.hasNodes ? withHasCode(out) : out;
+    return new _UnaryOp(this.loc, this.op, val);
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
@@ -892,9 +895,7 @@ var KeywordArgument = class _KeywordArgument extends NotCodeNode {
     return new _KeywordArgument(this.loc, this.name, await fn(this.arg));
   }
   async eval(state) {
-    const a = await this.arg.eval(state);
-    const out = new _KeywordArgument(this.loc, this.name, a);
-    return a.hasNodes ? withHasCode(out) : out;
+    return new _KeywordArgument(this.loc, this.name, await this.arg.eval(state));
   }
 };
 var Mapping = class _Mapping extends NotCodeNode {
@@ -912,10 +913,7 @@ var Mapping = class _Mapping extends NotCodeNode {
     return new _Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) })));
   }
   async eval(state) {
-    const pairs = await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) })));
-    var anyHas = pairs.some((p) => p.key.hasNodes || p.val.hasNodes);
-    const out = new _Mapping(this.loc, pairs);
-    return anyHas ? withHasCode(out) : out;
+    return new _Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) }))));
   }
   async toJS(state) {
     const out = {};
@@ -951,9 +949,7 @@ var Conditional = class _Conditional extends Node {
     }
     const ct = await this.caseTrue.eval(state);
     const cf = await this.caseFalse.eval(state);
-    var anyHas = cond.hasNodes || ct.hasNodes || cf.hasNodes;
-    const out = new _Conditional(this.loc, cond, ct, cf);
-    return anyHas ? withHasCode(out) : out;
+    return new _Conditional(this.loc, cond, ct, cf);
   }
   compile(state, refMap, ni) {
     compileNode(this.caseFalse, state, refMap, ni);
@@ -1005,9 +1001,7 @@ var SplatValue = class _SplatValue extends NotCodeNode {
     return new _SplatValue(this.loc, await fn(this.value));
   }
   async eval(state) {
-    const v = await this.value.eval(state);
-    const out = new _SplatValue(this.loc, v);
-    return v.hasNodes ? withHasCode(out) : out;
+    return new _SplatValue(this.loc, await this.value.eval(state));
   }
 };
 var PipePlaceholder = class extends Leaf {
@@ -1034,13 +1028,10 @@ var Block = class _Block extends Node {
   }
   async eval(state) {
     var last = new Value(this.loc, void 0);
-    const hadNodes = [];
     for (var v of this.body) {
       if (isinstance(v, DefaultPlaceholder)) last = new Value(v.loc, void 0);
       else last = await v.eval(state);
-      if (last.hasNodes) hadNodes.push(last);
     }
-    if (hadNodes.length > 0) return withHasCode(new _Block(this.loc, hadNodes));
     return last;
   }
   compile(state, refMap, ni) {
@@ -1055,11 +1046,6 @@ async function asyncNodePipe(nodes, fn) {
   return await Promise.all(nodes.map(fn));
 }
 __name(asyncNodePipe, "asyncNodePipe");
-function withHasCode(node) {
-  node.hasNodes = true;
-  return node;
-}
-__name(withHasCode, "withHasCode");
 function stackToNotes(stack) {
   const out = [];
   for (var s of stack) {
@@ -1078,29 +1064,28 @@ function newCompileData() {
   };
 }
 __name(newCompileData, "newCompileData");
+function scopeForName(name, state) {
+  return Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
+}
+__name(scopeForName, "scopeForName");
 function compileNode(node, state, cache, ni) {
-  if (isinstance(node, Leaf)) {
+  if (isinstance(node, Value)) {
     node.compile(state);
     return;
   }
   const entry = cache.get(node);
   const regname = "" + id(node);
-  console.group(node, regname);
   if (entry) {
     if (!entry[0]) {
       entry[0] = true;
-      console.log("--> no tap");
       if (entry[1] !== null) {
-        console.log("  -->> diamond reference");
         state.p.splice(entry[1], 0, [15 /* TAP_REGISTER */, allocRegister(regname, state)]);
         for (var e of cache.values()) {
           if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
         }
       } else {
-        console.log("  -->> backreference");
       }
     } else {
-      console.log("  -->> another reference");
     }
     state.p.push([14 /* GET_REGISTER */, allocRegister(regname, state)]);
     state.tosStereo = entry[2];
@@ -1109,12 +1094,10 @@ function compileNode(node, state, cache, ni) {
     cache.set(node, myEntry);
     node.compile(state, cache, ni);
     if (myEntry[0]) {
-      console.log("  -->> was backreffed");
       state.p.push([15 /* TAP_REGISTER */, allocRegister(regname, state)]);
     }
     myEntry[1] = state.p.length;
   }
-  console.groupEnd();
   return state;
 }
 __name(compileNode, "compileNode");
@@ -1704,6 +1687,7 @@ export {
   Symbol2 as Symbol,
   Assignment,
   Name,
+  LateBinding,
   Call,
   List,
   Definition,
@@ -1725,4 +1709,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-OLQY34MG.js.map
+//# sourceMappingURL=chunk-KJLP6I25.js.map

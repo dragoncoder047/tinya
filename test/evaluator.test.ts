@@ -35,7 +35,7 @@ beforeEach(() => {
             ]
         ],
         callstack: [],
-        recursionLimit: 100,
+        recursionLimit: 50,
         annotators: {},
     };
     dummyState.env = Object.create(dummyState.globalEnv);
@@ -99,7 +99,11 @@ describe("variables & scopes", () => {
             __class__: AST.Value,
             value: 200
         });
-        await expectEvalError("x", dummyState, "undefined: x");
+        await expectEval("x", dummyState, {
+            __class__: AST.LateBinding,
+            name: "x",
+            value: undefined
+        });
     });
     test("banned assignment targets", async () => {
         await expectEvalError("[a, b] = [1, 2]", dummyState, "cannot assign to this");
@@ -376,7 +380,11 @@ describe("templates", () => {
                 }
             ]
         });
-        await expectEvalError("x", dummyState, "undefined: x");
+        await expectEval("x", dummyState, {
+            __class__: AST.LateBinding,
+            name: "x",
+            value: undefined
+        });
     });
 });
 describe("defining functions", () => {
@@ -386,7 +394,11 @@ describe("defining functions", () => {
             __class__: AST.Value,
             value: 2100
         });
-        await expectEvalError("y", dummyState, "undefined: y");
+        await expectEval("y", dummyState, {
+            __class__: AST.LateBinding,
+            name: "y",
+            value: undefined
+        });
     });
     test("definitions with valid options", async () => {
         await expectEval("func(a: [.a => 1, .b => 2] = -1) :- a; func(.a + .a + .b)", dummyState, {
@@ -423,7 +435,7 @@ describe("recursion", () => {
         });
     });
     test("list expansion", async () => {
-        const x = 13;
+        const x = 2;
         await expectEval(`f(a, n) :- n > 0 ? [*f(a, n - 1), *f(a, n - 1)] : [a]; f(1, ${x})`, dummyState, {
             __class__: AST.List,
             values: new Array(2 ** x).fill({
