@@ -1,13 +1,15 @@
 import {
-  MessageCode,
-  ast,
-  baseCompileState,
   baseEnv,
+  compileInstrument,
+  disassemble,
   initWorklet,
+  newCompileData,
+  newEnv,
+  newSynth,
   nodeHelp,
   nodes,
   sources
-} from "./chunk-P7H6OUTQ.js";
+} from "./chunk-YO3MNY3H.js";
 import {
   AnnotatedValue,
   Assignment,
@@ -41,7 +43,7 @@ import {
   ast_exports,
   parse,
   stackToNotes
-} from "./chunk-IACEQXWF.js";
+} from "./chunk-HMJMCDWR.js";
 export {
   ast_exports as AST,
   AnnotatedValue,
@@ -60,7 +62,6 @@ export {
   List,
   LocationTrace,
   Mapping,
-  MessageCode,
   Name,
   Node,
   NotCodeNode,
@@ -74,11 +75,14 @@ export {
   Template,
   UnaryOp,
   Value,
-  baseCompileState,
   baseEnv,
+  compileInstrument,
+  disassemble,
   initWorklet,
-  ast as lib,
   sources as libSrc,
+  newCompileData,
+  newEnv,
+  newSynth,
   nodeHelp,
   nodes,
   parse,

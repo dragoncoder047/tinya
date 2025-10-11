@@ -1,9 +1,9 @@
 import { NodeDef } from "../compiler/evalState";
 import { OPERATORS } from "../compiler/operator";
-import { CompileState, Opcode, Program } from "../compiler/prog";
+import { CompiledVoiceData, Opcode, Program } from "../compiler/prog";
 import { isArray, isNumber } from "../utils";
 import { AutomatedValue, AutomatedValueMethod } from "./automation";
-import { Synth } from "./synth";
+import { WorkletSynth } from "./synthImpl";
 
 export enum PassMode {
     SET,
@@ -18,16 +18,16 @@ export class Tone {
     ac: any[] = [];
     acL: any[] = [];
     acR: any[] = [];
-    tmp: [number, number] = null as any;
+    tmp: [number, number] = [0, 0];
     pitch: AutomatedValue;
     expression: AutomatedValue;
     mods: AutomatedValue[];
     modToIndexMap: Record<string, number>;
     alive = true;
     constructor(
-        state: CompileState,
+        state: CompiledVoiceData,
         public dt: number,
-        public synth: Synth,
+        public synth: WorkletSynth,
         pitch: number,
         expression: number) {
         this.p = state.p;
@@ -37,9 +37,6 @@ export class Tone {
         this.expression = new AutomatedValue(expression, AutomatedValueMethod.EXPONENTIAL);
         this.mods = state.mods.map(([_, initial, mode]) => new AutomatedValue(initial, mode));
         this.modToIndexMap = Object.fromEntries(state.mods.map((m, i) => [m[0], i]));
-        if (state.tosStereo) {
-            this.p.push(Opcode.STEREO_DOUBLE_WIDEN);
-        }
     }
     /** SCREAMING HOT CODE */
     processSample(
@@ -50,7 +47,7 @@ export class Tone {
         gate: boolean,
         gain: number) {
         const stack = this.sc;
-        const args = this.sc;
+        const args = this.ac;
         const argsL = this.acL
         const argsR = this.acR;
         const prog = this.p;
@@ -60,9 +57,9 @@ export class Tone {
         const pitch = this.pitch.value;
         const expression = this.expression.value;
 
-        const push = (x: any) => stack[sp++] = x;
-        const pop = () => stack[sp--];
-        const peek = () => stack[sp];
+        const push = (x: any) => stack.push(x);//(stack[sp] = x, sp++);
+        const pop = () => stack.pop();//(sp--, stack[sp]);
+        const peek = () => stack.at(-1);//stack[sp - 1];
         const next = () => prog[pc++] as number;
 
         var pc: number, sp: number, a, b, c, i;
@@ -132,24 +129,25 @@ export class Tone {
                     push([a, a]);
                     break;
                 case Opcode.APPLY_NODE:
-                    a = pop();
-                    c = pop();
-                    args.length = c;
-                    i = 0;
-                    while (i < c) args[i++] = pop();
+                    a = next();
+                    i = args.length = next();
+                    while (i > 0) {
+                        i--;
+                        args[i] = pop();
+                    }
                     push(nodes[a]!(this.dt, args));
                     break;
                 case Opcode.GET_MOD:
                     push(this.mods[next()]?.value ?? 0);
                     break;
                 case Opcode.APPLY_DOUBLE_NODE_STEREO:
-                    a = pop();
-                    b = pop();
-                    c = pop();
-                    argsL.length = argsR.length = c;
-                    i = 0;
-                    while (i < c) args[i++] = pop();
-                    i = 0;
+                    a = next();
+                    b = next();
+                    i = args.length = argsL.length = argsR.length = c = next();
+                    while (i > 0) {
+                        i--;
+                        args[i] = pop();
+                    }
                     while (i < c) {
                         if (isArray(args[i])) {
                             argsL[i] = args[i][0];
@@ -166,6 +164,11 @@ export class Tone {
             }
         }
         a = pop();
+        if (!isArray(a)) {
+            tmp.length = 2;
+            tmp[0] = tmp[1] = a;
+            a = tmp;
+        }
         if (isNumber(a[0]) && isNaN(a[0])) a[0] = 0;
         if (isNumber(a[0]) && isNaN(a[1])) a[1] = 0;
         switch (mode) {

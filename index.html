@@ -14,6 +14,10 @@
                 image-rendering: -moz-crisp-edges;
                 image-rendering: -webkit-optimize-contrast;
             }
+
+            .stderr {
+                color: red;
+            }
         </style>
     </head>
 
@@ -21,28 +25,130 @@
         <h1>Syd test</h1>
         <p><a href="https://github.com/dragoncoder047/syd?tab=readme-ov-file">(What is this?)</a></p>
         <p><button id="play">Play</button></p>
-        <p>Instrument: <textarea id="instrument" rows="2" cols="100">BROKEN RN SORRY</textarea></p>
+        <p>Instrument: <textarea id="instrument" rows="2"
+                cols="100">(a = zzfxOscillator(200, shape: .triangle) + 0.1), [a, -a]</textarea></p>
         <canvas id="oscilloscope" width="800" height="200"></canvas>
-        <pre id="log"></pre>
+        <div id="log"></div>
         <script type="module">
-            import * as syd from "./build/syd.js";
+            import * as syd from "./build/index.js";
+            import { get, make, bind, waitFor } from "https://cdn.jsdelivr.net/gh/dragoncoder047/vanilla@main/vanilla.js";
 
-            function drawSamples(samples, canvas, ctx) {
+            const canvas = get("#oscilloscope");
+            const gfx = canvas.getContext("2d");
+
+            const audio = new AudioContext;
+
+
+            const logArea = get("#log");
+
+            await syd.initWorklet(audio);
+            waitFor("#play", "click").then(started);
+
+            const synth = syd.newSynth(audio);
+
+            const fftL = audio.createAnalyser();
+            const fftR = audio.createAnalyser();
+            const splitter = audio.createChannelSplitter(2);
+
+            synth.audioNode.connect(audio.destination);
+            synth.audioNode.connect(splitter);
+            splitter.connect(fftL, 0);
+            splitter.connect(fftR, 1);
+
+            synth.audioNode.onprocessorerror = e => {
+                showError("Synth died unexpectedly.");
+            };
+
+            bind("#instrument", "input", debounce(300, async () => {
+                const src = get("#instrument").value;
+                const dummyName = "<textarea>";
+                const fs = { ...syd.libSrc, [dummyName]: src };
+                try {
+                    clearLog();
+                    await synth.clearAll();
+                    const env = await makeEnv();
+                    const ast = await syd.parse(src, dummyName);
+                    const evaled = await ast.eval(env);
+                    const compiled = evaled.compile(syd.newCompileData(), syd.nodes());
+                    showLog(syd.disassemble(compiled));
+                    await synth.setPostFX(compiled);
+                } catch (e) {
+                    showError(e instanceof syd.SydError ? e.displayOn(fs) : e.stack);
+                }
+            }));
+
+            async function makeEnv() {
+                const env = await syd.newEnv();
+                env.functions.push([
+                    "log",
+                    1,
+                    async (args, env) => {
+                        const value = await args[0].eval(env);
+                        if (!(value instanceof syd.Value)) {
+                            showLog(`(${value.constructor.name}) ${JSON.stringify(value, null, 4)}`);
+                        }
+                        else showLog(value.value);
+                        return value;
+                    }
+                ]);
+                return env;
+            }
+
+            function started() {
+                audio.resume();
+                showLog("Started audio");
+                setInterval(drawOscilloscope, 200);
+            }
+
+            function showLog(logText) {
+                logArea.prepend(make("div", {}, make("pre", {}, logText)));
+            }
+            function showError(logText) {
+                logArea.prepend(make("div.stderr", {}, make("pre", {}, logText)));
+            }
+            function clearLog() {
+                logArea.innerHTML = "";
+            }
+
+            const samplesL = new Float32Array(fftL.fftSize);
+            const samplesR = new Float32Array(fftR.fftSize);
+            function drawOscilloscope() {
+                fftL.getFloatTimeDomainData(samplesL);
+                fftR.getFloatTimeDomainData(samplesR);
+                drawSamples(samplesL, samplesR, canvas, gfx);
+            }
+
+            function drawSamples(samplesL, samplesR, canvas, ctx) {
                 const ratio = window.devicePixelRatio || 1;
                 const width = canvas.width = (canvas.style.width = 500) * ratio;
                 const height = canvas.height = (canvas.style.height = 100) * ratio;
-                ctx.strokeStyle = "black";
+                ctx.strokeStyle = "purple";
                 ctx.lineWidth = 1;
                 ctx.imageSmoothingEnabled = false;
                 ctx.clearRect(0, 0, width, height);
                 ctx.beginPath();
-                ctx.moveTo(0, height / 2);
-                for (let i = 0; i < samples.length; i++) {
-                    const x = (i / samples.length) * width;
-                    const y = (samples[i] + 1) * height / 2;
-                    ctx.lineTo(x, y);
+                for (let i = 0; i < samplesL.length; i++) {
+                    const x = (i / samplesL.length) * width;
+                    const y = (samplesL[i] + 1) * height / 2;
+                    ctx[i > 0 ? "lineTo" : "moveTo"](x, y);
                 }
                 ctx.stroke();
+                ctx.strokeStyle = "black";
+                ctx.beginPath();
+                for (let i = 0; i < samplesR.length; i++) {
+                    const x = (i / samplesR.length) * width;
+                    const y = (samplesR[i] + 1) * height / 2;
+                    ctx[i > 0 ? "lineTo" : "moveTo"](x, y);
+                }
+                ctx.stroke();
+            }
+
+            function debounce(timeout, fun) {
+                var tid = null;
+                return () => {
+                    clearTimeout(tid);
+                    setTimeout(fun, timeout);
+                }
             }
         </script>
     </body>

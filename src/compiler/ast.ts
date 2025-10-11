@@ -2,21 +2,22 @@ import { isinstance, str } from "../utils";
 import { processArgsInCall } from "./call";
 import { makeCodeMacroExpander } from "./codemacro";
 import { CompileError, ErrorNote, LocationTrace, RuntimeError } from "./errors";
-import { EvalState, NodeDef, NodeValueType } from "./evalState";
+import { EvalState, NodeDef, NodeValueType, pushNamed } from "./evalState";
 import { OPERATORS } from "./operator";
-import { allocNode, allocRegister, CompileState, Opcode, Program } from "./prog";
+import { allocNode, allocRegister, CompiledVoiceData, Opcode, Program } from "./prog";
 
 export abstract class Node {
+    hasNodes = false;
     constructor(public loc: LocationTrace) { }
     abstract edgemost(left: boolean): Node;
     abstract pipe(fn: (node: Node) => Promise<Node>): Promise<Node>;
     abstract eval(state: EvalState): Promise<Node>;
-    abstract compile(state: CompileState, ni: NodeDef[]): CompileState;
+    abstract compile(state: CompiledVoiceData, ni: NodeDef[]): CompiledVoiceData;
 }
 
 export abstract class NotCodeNode extends Node {
-    compile(state: CompileState): CompileState {
-        throw new CompileError("how did we get here ?!?", this.loc);
+    compile(state: CompiledVoiceData): CompiledVoiceData {
+        throw new CompileError("how did we get here ?!? (" + this.constructor.name + ")", this.loc);
     }
 }
 
@@ -32,6 +33,7 @@ export class AnnotatedValue extends NotCodeNode {
     edgemost(left: boolean): Node { return left ? (this.attributes.length > 0 ? this.attributes[0]!.edgemost(left) : this) : (this.value ?? this); }
     async eval(state: EvalState) {
         var v = this.value;
+        var anyHas = false;
         for (var attr of this.attributes) {
             var args: Node[] | null = null;
             var name: string;
@@ -45,10 +47,12 @@ export class AnnotatedValue extends NotCodeNode {
                     args = attr.args;
                 }
                 v = await impl(v, args, state);
+                if (v.hasNodes) anyHas = true;
             } else {
                 throw new RuntimeError("illegal annotation", attr.loc, stackToNotes(state.callstack));
             }
         }
+        if (v && anyHas) return withHasCode(v!);
         return v!;
     }
 }
@@ -59,7 +63,7 @@ export class Value extends Leaf {
         if (isinstance(this.value, Node)) return this.value;
         return this;
     }
-    compile(state: CompileState) {
+    compile(state: CompiledVoiceData) {
         state.p.push(Opcode.PUSH_CONSTANT, this.value);
         state.tosStereo = false;
         return state;
@@ -83,9 +87,14 @@ export class Assignment extends Node {
         }
         const name = this.target.name;
         const scope = Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
-        return scope[name] = await this.value.eval(state);
+        scope[name] = new LateBinding(this.loc, name);
+        const val = scope[name] = await this.value.eval(state);
+        if (val.hasNodes) {
+            return withHasCode(new Assignment(this.loc, this.target, val));
+        }
+        return val;
     }
-    compile(state: CompileState, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, ni: NodeDef[]) {
         this.value.compile(state, ni);
         state.p.push(Opcode.TAP_REGISTER, allocRegister((this.target as any).name, state));
         return state;
@@ -101,9 +110,15 @@ export class Name extends Leaf {
         }
         return val;
     }
-    compile(state: CompileState) {
+    compile(state: CompiledVoiceData) {
         state.p.push(Opcode.GET_REGISTER, allocRegister(this.name, state));
         return state;
+    }
+}
+
+class LateBinding extends Name {
+    async eval(state: EvalState) {
+        return withHasCode(this);
     }
 }
 
@@ -111,10 +126,10 @@ export class Call extends Node {
     constructor(trace: LocationTrace, public name: string, public args: Node[]) { super(trace); };
     edgemost(left: boolean): Node { return left ? this : this.args.at(-1)?.edgemost(left) ?? this; }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Call(this.loc, this.name, await asyncNodePipe(this.args, fn)); }
-    async eval(state: EvalState) {
+    async eval(state: EvalState): Promise<Node> {
         const funcImpl = state.functions.find(f => f[0] === this.name);
         if (funcImpl) {
-            const [name, argc, impl] = funcImpl;
+            const impl = funcImpl[2];
             const newState: EvalState = { ...state, callstack: state.callstack.concat(this) };
             return impl(this.args, newState);
         }
@@ -126,9 +141,9 @@ export class Call extends Node {
         if (nodeImpl[2] === NodeValueType.DECOUPLED_MATH && (x = new List(this.loc, this.args)).isImmediate()) {
             return new Value(this.loc, nodeImpl[4]!(null as any)(null!, x.toImmediate()!));
         }
-        return new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl));
+        return withHasCode(new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl)));
     }
-    compile(state: CompileState, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, ni: NodeDef[]) {
         var i: number;
         const nodeImpl = ni.find(n => n[0] === this.name);
         if (!nodeImpl) {
@@ -142,7 +157,7 @@ export class Call extends Node {
             argProgs.push([state.p, state.tosStereo ? NodeValueType.STEREO : NodeValueType.NORMAL_OR_MONO]);
         }
         state.p = existingProg;
-        const callProg: Program = [Opcode.APPLY_NODE, allocNode(this.name, state)];
+        const callProg: Program = [Opcode.APPLY_NODE, allocNode(this.name, state), nodeImpl[1].length];
         // logic for stereo/mono nodes:
         // if the node is x -> stereo, the inputs must all be the right type (mono to stereo can be widened; stereo to mono can't be narrowed, error)
         // if the node is mono -> mono, the node itself is duplicated if any inputs are stereo and the output is stereo, else mono
@@ -160,7 +175,7 @@ export class Call extends Node {
             }
             state.tosStereo = true;
             callProg[0] = Opcode.APPLY_DOUBLE_NODE_STEREO;
-            callProg.push(allocNode(this.name, state)); // 2nd node
+            callProg.splice(2, 0, allocNode(this.name, state)); // 2nd node
         }
         else {
             for (i = 0; i < nodeImpl[1].length; i++) {
@@ -188,15 +203,18 @@ export class List extends Node {
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new List(this.loc, await asyncNodePipe(this.values, fn)); }
     async eval(state: EvalState) {
         const values: Node[] = [];
+        var anyHas = false;
         for (var v of this.values) {
             const v2 = await v.eval(state);
+            if (v2.hasNodes) anyHas = true;
             if (isinstance(v2, SplatValue) && isinstance(v2.value, List)) {
                 values.push(...v2.value.values);
             } else {
                 values.push(v2);
             }
         }
-        return new List(this.loc, values);
+        const res = new List(this.loc, values);
+        return anyHas ? withHasCode(res) : res;
     }
     hasSplats() {
         return this.values.some(v => isinstance(v, SplatValue));
@@ -212,7 +230,7 @@ export class List extends Node {
     static fromImmediate(trace: LocationTrace, m: any[]): List | Value {
         return Array.isArray(m) ? new List(trace, m.map(r => List.fromImmediate(trace, r))) : new Value(trace, m);
     }
-    compile(state: CompileState, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, ni: NodeDef[]) {
         if (this.isImmediate()) {
             const imm = this.toImmediate() as any;
             state.p.push(Opcode.PUSH_CONSTANT, imm);
@@ -238,7 +256,7 @@ export class Definition extends NotCodeNode {
     edgemost(left: boolean): Node { return left ? this.parameters.length > 0 ? this.parameters[0]!.edgemost(left) : this : this.body.edgemost(left); }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Definition(this.loc, this.name, this.outMacro, await asyncNodePipe(this.parameters, fn), await fn(this.body)); }
     async eval(state: EvalState) {
-        state.functions.push([this.name, this.parameters.length, makeCodeMacroExpander(this.name, this.outMacro, this.parameters, this.body)]);
+        pushNamed(state.functions, [this.name, this.parameters.length, makeCodeMacroExpander(this.name, this.outMacro, this.parameters, this.body)]);
         return new Value(this.loc, undefined);
     }
 }
@@ -310,9 +328,10 @@ export class BinaryOp extends Node {
         if (isinstance(left, Symbol) && isinstance(right, Symbol) && /^[!=]=$/.test(this.op)) {
             return List.fromImmediate(this.loc, fn!(left.value, b.value));
         }
-        return new BinaryOp(this.loc, this.op, left, right);
+        const out = new BinaryOp(this.loc, this.op, left, right);
+        return (left.hasNodes || right.hasNodes) ? withHasCode(out) : out;
     }
-    compile(state: CompileState, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, ni: NodeDef[]) {
         this.left.compile(state, ni);
         this.right.compile(state, ni);
         state.p.push(Opcode.DO_BINARY_OP, this.op);
@@ -340,9 +359,10 @@ export class UnaryOp extends Node {
         if (imm && (fn = OPERATORS[this.op]?.cu)) {
             return List.fromImmediate(this.loc, fn(value));
         }
-        return new UnaryOp(this.loc, this.op, val);
+        const out = new UnaryOp(this.loc, this.op, val);
+        return val.hasNodes ? withHasCode(out) : out;
     }
-    compile(state: CompileState, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, ni: NodeDef[]) {
         this.value.compile(state, ni);
         state.p.push(Opcode.DO_UNARY_OP, this.op);
         return state;
@@ -360,7 +380,9 @@ export class KeywordArgument extends NotCodeNode {
     edgemost(left: boolean): Node { return left ? this : this.arg.edgemost(left); }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new KeywordArgument(this.loc, this.name, await fn(this.arg)); }
     async eval(state: EvalState) {
-        return new KeywordArgument(this.loc, this.name, await this.arg.eval(state));
+        const a = await this.arg.eval(state);
+        const out = new KeywordArgument(this.loc, this.name, a);
+        return a.hasNodes ? withHasCode(out) : out;
     }
 }
 
@@ -368,7 +390,12 @@ export class Mapping extends NotCodeNode {
     constructor(trace: LocationTrace, public mapping: { key: Node, val: Node }[]) { super(trace); }
     edgemost(left: boolean): Node { return this.mapping.length > 0 ? left ? this.mapping[0]!.key.edgemost(left) : this.mapping.at(-1)!.val.edgemost(left) : this; }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) }))); }
-    async eval(state: EvalState) { return new Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) })))); }
+    async eval(state: EvalState) {
+        const pairs = await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) })));
+        var anyHas = pairs.some(p => p.key.hasNodes || p.val.hasNodes);
+        const out = new Mapping(this.loc, pairs);
+        return anyHas ? withHasCode(out) : out;
+    }
     async toJS(state: EvalState): Promise<Record<string, Node>> {
         const out: Record<string, Node> = {};
         for (var { key, val } of this.mapping) {
@@ -390,12 +417,26 @@ export class Conditional extends Node {
         if (isinstance(cond, Value)) {
             return (!cond.value ? this.caseFalse : this.caseTrue).eval(state);
         }
-        return new Conditional(this.loc, cond, await this.caseTrue.eval(state), await this.caseFalse.eval(state));
+        const ct = await this.caseTrue.eval(state);
+        const cf = await this.caseFalse.eval(state);
+        var anyHas = cond.hasNodes || ct.hasNodes || cf.hasNodes;
+        const out = new Conditional(this.loc, cond, ct, cf);
+        return anyHas ? withHasCode(out) : out;
     }
-    compile(state: CompileState, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, ni: NodeDef[]) {
         this.caseFalse.compile(state, ni);
+        const stereoF = state.tosStereo;
+        const stereoI = state.p.length;
         this.caseTrue.compile(state, ni);
+        const stereoT = state.tosStereo;
+        if ((state.tosStereo ||= stereoF)) {
+            if (!stereoT) state.p.push(Opcode.STEREO_DOUBLE_WIDEN);
+            if (!stereoF) state.p.splice(stereoI, 0, Opcode.STEREO_DOUBLE_WIDEN);
+        }
         this.cond.compile(state, ni);
+        if (state.tosStereo) {
+            throw new CompileError("cannot use stereo output as condition", this.cond.loc);
+        }
         state.p.push(Opcode.CONDITIONAL_SELECT);
         return state;
     }
@@ -415,7 +456,9 @@ export class SplatValue extends NotCodeNode {
     edgemost(left: boolean): Node { return this.value.edgemost(left); }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new SplatValue(this.loc, await fn(this.value)); }
     async eval(state: EvalState) {
-        return new SplatValue(this.loc, await this.value.eval(state));
+        const v = await this.value.eval(state);
+        const out = new SplatValue(this.loc, v);
+        return v.hasNodes ? withHasCode(out) : out;
     }
 }
 
@@ -429,15 +472,18 @@ export class Block extends Node {
     constructor(trace: LocationTrace, public body: Node[]) { super(trace); }
     edgemost(left: boolean): Node { return this.body.length > 0 ? left ? this.body[0]!.edgemost(left) : this.body.at(-1)!.edgemost(left) : this; }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Block(this.loc, await asyncNodePipe(this.body, fn)); }
-    async eval(state: EvalState) {
+    async eval(state: EvalState): Promise<Node> {
         var last: Node = new Value(this.loc, undefined);
+        const hadNodes: Node[] = [];
         for (var v of this.body) {
             if (isinstance(v, DefaultPlaceholder)) last = new Value(v.loc, undefined);
             else last = await v.eval(state);
+            if (last.hasNodes) hadNodes.push(last);
         }
+        if (hadNodes.length > 0) return withHasCode(new Block(this.loc, hadNodes));
         return last;
     }
-    compile(state: CompileState, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, ni: NodeDef[]) {
         for (var arg of this.body) {
             arg.compile(state, ni);
             state.p.push(Opcode.DROP_TOP);
@@ -450,6 +496,10 @@ export class Block extends Node {
 
 async function asyncNodePipe<T>(nodes: T[], fn: (node: T) => Promise<T>): Promise<T[]> {
     return await Promise.all(nodes.map(fn));
+}
+function withHasCode<T extends Node>(node: T): T {
+    node.hasNodes = true;
+    return node;
 }
 
 export function stackToNotes(stack: Call[]): ErrorNote[] {

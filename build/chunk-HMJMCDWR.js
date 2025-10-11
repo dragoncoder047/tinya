@@ -112,16 +112,14 @@ __name(isinstance, "isinstance");
 
 // src/compiler/call.ts
 async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
-  const newArgs = [];
-  const seenArgs = {};
+  const newArgs = nodeImpl[1].map((arg) => arg[1] !== null ? new Value(site, arg[1]) : null);
+  console.log("initial args", newArgs.slice());
+  const seenArgs = newArgs.map((_) => null);
   var firstKW;
   for (var i = 0; i < args.length; i++) {
     const arg = args[i];
     var argIndex = i;
     if (isinstance(arg, KeywordArgument)) {
-      if (seenArgs[arg.name]) {
-        throw new RuntimeError(`argument ${str(arg.name)} already provided`, arg.loc, [new ErrorNote("note: first occurrance was here:", seenArgs[arg.name].edgemost(true).loc), ...stackToNotes(state.callstack)]);
-      }
       if (!firstKW) firstKW = arg;
       argIndex = nodeImpl[1].findIndex((a) => a[0] === arg.name);
       if (argIndex === -1) {
@@ -132,7 +130,10 @@ async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
       if (i >= nodeImpl[1].length) throw new RuntimeError("too many arguments to " + nodeImpl[0], arg.edgemost(true).loc, stackToNotes(state.callstack));
     }
     const argEntry = nodeImpl[1][argIndex];
-    seenArgs[argEntry[0]] = arg;
+    if (seenArgs[argIndex]) {
+      throw new RuntimeError(`argument ${str(argEntry[0])} already provided`, arg.loc, [new ErrorNote("note: first occurrance was here:", seenArgs[argIndex].edgemost(true).loc), ...stackToNotes(state.callstack)]);
+    }
+    seenArgs[argIndex] = arg;
     const defaultValue = argEntry[1];
     const enumChoices = nodeImpl[3][argIndex] ?? null;
     const walkAndReplaceSymbols = /* @__PURE__ */ __name(async (ast) => {
@@ -149,7 +150,7 @@ async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
       }
       return ast.pipe(walkAndReplaceSymbols);
     }, "walkAndReplaceSymbols");
-    var value = await walkAndReplaceSymbols(arg);
+    var value = await walkAndReplaceSymbols(isinstance(arg, KeywordArgument) ? arg.arg : arg);
     if (isinstance(arg, DefaultPlaceholder)) {
       if ((defaultValue ?? null) === null) {
         throw new RuntimeError(`missing value for argument ${argEntry[0]}`, arg.loc, stackToNotes(state.callstack));
@@ -159,22 +160,28 @@ async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
       throw new RuntimeError("splats are only valid in a list", arg.loc, stackToNotes(state.callstack));
     } else if (doEvalArgs) {
       value = await value.eval(state);
+      if (value.hasNodes) throw new RuntimeError("cannot use value dependent on audio node output in compile-time calculation", value.loc);
     }
     newArgs[argIndex] = value;
   }
   for (var i = 0; i < nodeImpl[1].length; i++) {
-    if (newArgs[i] === void 0) {
+    if (newArgs[i] === null) {
       const argEntry = nodeImpl[1][i];
-      const defaultValue = argEntry[1];
-      if ((defaultValue ?? null) === null) {
-        throw new RuntimeError(`missing value for argument ${argEntry[0]}`, site, stackToNotes(state.callstack));
-      }
-      newArgs[i] = new Value(site, defaultValue);
+      throw new RuntimeError(`missing value for argument ${argEntry[0]}`, site, stackToNotes(state.callstack));
     }
   }
+  console.log("final args", newArgs.slice());
   return newArgs;
 }
 __name(processArgsInCall, "processArgsInCall");
+
+// src/compiler/evalState.ts
+function pushNamed(defs, newDef) {
+  const i = defs.findIndex((d) => d[0] === newDef[0]);
+  if (i !== -1) defs[i] = newDef;
+  else defs.push(newDef);
+}
+__name(pushNamed, "pushNamed");
 
 // src/compiler/codemacro.ts
 function makeCodeMacroExpander(name, finalMacro, params, body) {
@@ -344,6 +351,28 @@ function isRightAssociative(token) {
 __name(isRightAssociative, "isRightAssociative");
 
 // src/compiler/prog.ts
+var Opcode = /* @__PURE__ */ ((Opcode2) => {
+  Opcode2[Opcode2["PUSH_CONSTANT"] = 0] = "PUSH_CONSTANT";
+  Opcode2[Opcode2["PUSH_INPUT_SAMPLES"] = 1] = "PUSH_INPUT_SAMPLES";
+  Opcode2[Opcode2["PUSH_PITCH"] = 2] = "PUSH_PITCH";
+  Opcode2[Opcode2["PUSH_EXPRESSION"] = 3] = "PUSH_EXPRESSION";
+  Opcode2[Opcode2["PUSH_GATE"] = 4] = "PUSH_GATE";
+  Opcode2[Opcode2["MARK_STILL_ALIVE"] = 5] = "MARK_STILL_ALIVE";
+  Opcode2[Opcode2["DROP_TOP"] = 6] = "DROP_TOP";
+  Opcode2[Opcode2["PUSH_FRESH_EMPTY_LIST"] = 7] = "PUSH_FRESH_EMPTY_LIST";
+  Opcode2[Opcode2["APPEND_TO_LIST"] = 8] = "APPEND_TO_LIST";
+  Opcode2[Opcode2["EXTEND_TO_LIST"] = 9] = "EXTEND_TO_LIST";
+  Opcode2[Opcode2["DO_BINARY_OP"] = 10] = "DO_BINARY_OP";
+  Opcode2[Opcode2["DO_UNARY_OP"] = 11] = "DO_UNARY_OP";
+  Opcode2[Opcode2["GET_REGISTER"] = 12] = "GET_REGISTER";
+  Opcode2[Opcode2["TAP_REGISTER"] = 13] = "TAP_REGISTER";
+  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 14] = "CONDITIONAL_SELECT";
+  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 15] = "STEREO_DOUBLE_WIDEN";
+  Opcode2[Opcode2["APPLY_NODE"] = 16] = "APPLY_NODE";
+  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 17] = "APPLY_DOUBLE_NODE_STEREO";
+  Opcode2[Opcode2["GET_MOD"] = 18] = "GET_MOD";
+  return Opcode2;
+})(Opcode || {});
 function allocRegister(name, state) {
   const i = state.r.indexOf(name);
   if (i === -1) return state.r.push(name) - 1;
@@ -363,13 +392,14 @@ var Node = class {
   static {
     __name(this, "Node");
   }
+  hasNodes = false;
 };
 var NotCodeNode = class extends Node {
   static {
     __name(this, "NotCodeNode");
   }
   compile(state) {
-    throw new CompileError("how did we get here ?!?", this.loc);
+    throw new CompileError("how did we get here ?!? (" + this.constructor.name + ")", this.loc);
   }
 };
 var Leaf = class extends NotCodeNode {
@@ -403,6 +433,7 @@ var AnnotatedValue = class _AnnotatedValue extends NotCodeNode {
   }
   async eval(state) {
     var v = this.value;
+    var anyHas = false;
     for (var attr of this.attributes) {
       var args = null;
       var name;
@@ -416,10 +447,12 @@ var AnnotatedValue = class _AnnotatedValue extends NotCodeNode {
           args = attr.args;
         }
         v = await impl(v, args, state);
+        if (v.hasNodes) anyHas = true;
       } else {
         throw new RuntimeError("illegal annotation", attr.loc, stackToNotes(state.callstack));
       }
     }
+    if (v && anyHas) return withHasCode(v);
     return v;
   }
 };
@@ -474,7 +507,12 @@ var Assignment = class _Assignment extends Node {
     }
     const name = this.target.name;
     const scope = Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
-    return scope[name] = await this.value.eval(state);
+    scope[name] = new LateBinding(this.loc, name);
+    const val = scope[name] = await this.value.eval(state);
+    if (val.hasNodes) {
+      return withHasCode(new _Assignment(this.loc, this.target, val));
+    }
+    return val;
   }
   compile(state, ni) {
     this.value.compile(state, ni);
@@ -502,6 +540,14 @@ var Name = class extends Leaf {
     return state;
   }
 };
+var LateBinding = class extends Name {
+  static {
+    __name(this, "LateBinding");
+  }
+  async eval(state) {
+    return withHasCode(this);
+  }
+};
 var Call = class _Call extends Node {
   constructor(trace, name, args) {
     super(trace);
@@ -520,7 +566,7 @@ var Call = class _Call extends Node {
   async eval(state) {
     const funcImpl = state.functions.find((f) => f[0] === this.name);
     if (funcImpl) {
-      const [name, argc, impl] = funcImpl;
+      const impl = funcImpl[2];
       const newState = { ...state, callstack: state.callstack.concat(this) };
       return impl(this.args, newState);
     }
@@ -532,7 +578,7 @@ var Call = class _Call extends Node {
     if (nodeImpl[2] === 2 /* DECOUPLED_MATH */ && (x = new List(this.loc, this.args)).isImmediate()) {
       return new Value(this.loc, nodeImpl[4](null)(null, x.toImmediate()));
     }
-    return new _Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl));
+    return withHasCode(new _Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl)));
   }
   compile(state, ni) {
     var i;
@@ -548,7 +594,7 @@ var Call = class _Call extends Node {
       argProgs.push([state.p, state.tosStereo ? 1 /* STEREO */ : 0 /* NORMAL_OR_MONO */]);
     }
     state.p = existingProg;
-    const callProg = [16 /* APPLY_NODE */, allocNode(this.name, state)];
+    const callProg = [16 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
     state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
     if (nodeImpl[1].every((a) => a[2] !== 1 /* STEREO */) && argProgs.some((s) => s[1] === 1 /* STEREO */)) {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -559,7 +605,7 @@ var Call = class _Call extends Node {
       }
       state.tosStereo = true;
       callProg[0] = 17 /* APPLY_DOUBLE_NODE_STEREO */;
-      callProg.push(allocNode(this.name, state));
+      callProg.splice(2, 0, allocNode(this.name, state));
     } else {
       for (i = 0; i < nodeImpl[1].length; i++) {
         const neededArgType = nodeImpl[1][i][2] ?? 0 /* NORMAL_OR_MONO */;
@@ -595,15 +641,18 @@ var List = class _List extends Node {
   }
   async eval(state) {
     const values = [];
+    var anyHas = false;
     for (var v of this.values) {
       const v2 = await v.eval(state);
+      if (v2.hasNodes) anyHas = true;
       if (isinstance(v2, SplatValue) && isinstance(v2.value, _List)) {
         values.push(...v2.value.values);
       } else {
         values.push(v2);
       }
     }
-    return new _List(this.loc, values);
+    const res = new _List(this.loc, values);
+    return anyHas ? withHasCode(res) : res;
   }
   hasSplats() {
     return this.values.some((v) => isinstance(v, SplatValue));
@@ -657,7 +706,7 @@ var Definition = class _Definition extends NotCodeNode {
     return new _Definition(this.loc, this.name, this.outMacro, await asyncNodePipe(this.parameters, fn), await fn(this.body));
   }
   async eval(state) {
-    state.functions.push([this.name, this.parameters.length, makeCodeMacroExpander(this.name, this.outMacro, this.parameters, this.body)]);
+    pushNamed(state.functions, [this.name, this.parameters.length, makeCodeMacroExpander(this.name, this.outMacro, this.parameters, this.body)]);
     return new Value(this.loc, void 0);
   }
 };
@@ -762,7 +811,8 @@ var BinaryOp = class _BinaryOp extends Node {
     if (isinstance(left, Symbol2) && isinstance(right, Symbol2) && /^[!=]=$/.test(this.op)) {
       return List.fromImmediate(this.loc, fn(left.value, b.value));
     }
-    return new _BinaryOp(this.loc, this.op, left, right);
+    const out = new _BinaryOp(this.loc, this.op, left, right);
+    return left.hasNodes || right.hasNodes ? withHasCode(out) : out;
   }
   compile(state, ni) {
     this.left.compile(state, ni);
@@ -802,7 +852,8 @@ var UnaryOp = class _UnaryOp extends Node {
     if (imm && (fn = OPERATORS[this.op]?.cu)) {
       return List.fromImmediate(this.loc, fn(value));
     }
-    return new _UnaryOp(this.loc, this.op, val);
+    const out = new _UnaryOp(this.loc, this.op, val);
+    return val.hasNodes ? withHasCode(out) : out;
   }
   compile(state, ni) {
     this.value.compile(state, ni);
@@ -834,7 +885,9 @@ var KeywordArgument = class _KeywordArgument extends NotCodeNode {
     return new _KeywordArgument(this.loc, this.name, await fn(this.arg));
   }
   async eval(state) {
-    return new _KeywordArgument(this.loc, this.name, await this.arg.eval(state));
+    const a = await this.arg.eval(state);
+    const out = new _KeywordArgument(this.loc, this.name, a);
+    return a.hasNodes ? withHasCode(out) : out;
   }
 };
 var Mapping = class _Mapping extends NotCodeNode {
@@ -852,7 +905,10 @@ var Mapping = class _Mapping extends NotCodeNode {
     return new _Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) })));
   }
   async eval(state) {
-    return new _Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) }))));
+    const pairs = await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) })));
+    var anyHas = pairs.some((p) => p.key.hasNodes || p.val.hasNodes);
+    const out = new _Mapping(this.loc, pairs);
+    return anyHas ? withHasCode(out) : out;
   }
   async toJS(state) {
     const out = {};
@@ -886,12 +942,26 @@ var Conditional = class _Conditional extends Node {
     if (isinstance(cond, Value)) {
       return (!cond.value ? this.caseFalse : this.caseTrue).eval(state);
     }
-    return new _Conditional(this.loc, cond, await this.caseTrue.eval(state), await this.caseFalse.eval(state));
+    const ct = await this.caseTrue.eval(state);
+    const cf = await this.caseFalse.eval(state);
+    var anyHas = cond.hasNodes || ct.hasNodes || cf.hasNodes;
+    const out = new _Conditional(this.loc, cond, ct, cf);
+    return anyHas ? withHasCode(out) : out;
   }
   compile(state, ni) {
     this.caseFalse.compile(state, ni);
+    const stereoF = state.tosStereo;
+    const stereoI = state.p.length;
     this.caseTrue.compile(state, ni);
+    const stereoT = state.tosStereo;
+    if (state.tosStereo ||= stereoF) {
+      if (!stereoT) state.p.push(15 /* STEREO_DOUBLE_WIDEN */);
+      if (!stereoF) state.p.splice(stereoI, 0, 15 /* STEREO_DOUBLE_WIDEN */);
+    }
     this.cond.compile(state, ni);
+    if (state.tosStereo) {
+      throw new CompileError("cannot use stereo output as condition", this.cond.loc);
+    }
     state.p.push(14 /* CONDITIONAL_SELECT */);
     return state;
   }
@@ -929,7 +999,9 @@ var SplatValue = class _SplatValue extends NotCodeNode {
     return new _SplatValue(this.loc, await fn(this.value));
   }
   async eval(state) {
-    return new _SplatValue(this.loc, await this.value.eval(state));
+    const v = await this.value.eval(state);
+    const out = new _SplatValue(this.loc, v);
+    return v.hasNodes ? withHasCode(out) : out;
   }
 };
 var PipePlaceholder = class extends Leaf {
@@ -956,10 +1028,13 @@ var Block = class _Block extends Node {
   }
   async eval(state) {
     var last = new Value(this.loc, void 0);
+    const hadNodes = [];
     for (var v of this.body) {
       if (isinstance(v, DefaultPlaceholder)) last = new Value(v.loc, void 0);
       else last = await v.eval(state);
+      if (last.hasNodes) hadNodes.push(last);
     }
+    if (hadNodes.length > 0) return withHasCode(new _Block(this.loc, hadNodes));
     return last;
   }
   compile(state, ni) {
@@ -975,6 +1050,11 @@ async function asyncNodePipe(nodes, fn) {
   return await Promise.all(nodes.map(fn));
 }
 __name(asyncNodePipe, "asyncNodePipe");
+function withHasCode(node) {
+  node.hasNodes = true;
+  return node;
+}
+__name(withHasCode, "withHasCode");
 function stackToNotes(stack) {
   const out = [];
   for (var s of stack) {
@@ -1539,6 +1619,7 @@ __name(parse, "parse");
 
 export {
   __name,
+  Opcode,
   TAU,
   sin,
   cos,
@@ -1587,4 +1668,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-IACEQXWF.js.map
+//# sourceMappingURL=chunk-HMJMCDWR.js.map

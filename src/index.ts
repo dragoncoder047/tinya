@@ -1,13 +1,14 @@
-export { baseEnv, baseCompileState, nodes, nodeHelp, libSrc, lib } from "./lib";
+export { baseEnv, newCompileData, nodes, nodeHelp, libSrc, newEnv, compileInstrument } from "./lib";
 export * from "./compiler/ast";
 export * as AST from "./compiler/ast";
 export { SydError, ErrorNote, LocationTrace, ParseError, CompileError, RuntimeError } from "./compiler/errors";
 export { parse } from "./compiler";
-export { Message, MessageCode } from "./worklet";
+export { newSynth } from "./runtime/synthProxy";
+export { disassemble } from "./runtime/disassemble";
 
-export function initWorklet(context: AudioContext, pathToWorkletScript?: URL | string) {
+export function initWorklet(context: AudioContext, pathToWorkletScript?: URL | string): Promise<void> {
     if (pathToWorkletScript === undefined) {
         pathToWorkletScript = new URL("./sydWorklet.js", import.meta.url);
     }
-    context.audioWorklet.addModule(pathToWorkletScript);
+    return context.audioWorklet.addModule(pathToWorkletScript);
 }

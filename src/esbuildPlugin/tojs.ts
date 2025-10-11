@@ -114,7 +114,7 @@ export async function toJSFile(filename: string): Promise<{ src: string, watchFi
         src: `import { ${[...neededNames.values()].join(", ")} } from "syd";
 
 export const sources = /* @__PURE__ */ {
-    ${Object.entries(files).map(([name, source]) => str(name) + ":\n" + indent(str(source.split("\n"), null, 4))).join(",\n    ")}
+    ${Object.entries(files).map(([name, source]) => `${str(name)}:\n${indent(str(source.split("\n"), null, 4))}.join("\\n")`).join(",\n    ")}
 };
 
 ${getInternedStrings()}

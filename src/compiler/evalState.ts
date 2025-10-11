@@ -1,4 +1,4 @@
-import { Synth } from "../runtime/synth";
+import { WorkletSynth } from "../runtime/synthImpl";
 import * as AST from "./ast";
 
 export interface EvalState {
@@ -31,8 +31,14 @@ export type NodeDef = [
     params: [name: string, default_: number | null, type?: NodeValueType][],
     returnType: NodeValueType,
     enumChoices: (Record<string, number> | undefined)[],
-    impl: (synth: Synth) => (dt: number, args: number[]) => number,
+    impl: (synth: WorkletSynth) => (dt: number, args: number[]) => number,
 ];
+
+export function pushNamed<T extends NodeDef | MacroDef>(defs: T[], newDef: T) {
+    const i = defs.findIndex(d => d[0] === newDef[0]);
+    if (i !== -1) defs[i] = newDef;
+    else defs.push(newDef);
+}
 
 export type NodeHelp = {
     description: string;

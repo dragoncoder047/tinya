@@ -36,7 +36,7 @@ export async function include(entrypoint: string, outSourceFileMap: Record<strin
         const errTrace = sm1.map(t => new ErrorNote("note: included from here:", t.loc));
         // check if file exists
         if (!curIP.exists) {
-            throw new ParseError("no such file " + str(curFile), curIP.loc, errTrace);
+            throw new ParseError("no such file " + str(curFile), stack[0]!.loc, errTrace.slice(0, -1));
         }
         // check if circular deps
         if (sm1.some(t => t.filename === curFile)) {
@@ -68,7 +68,7 @@ export async function include(entrypoint: string, outSourceFileMap: Record<strin
     }
     return {
         order: orderFiles.map(f => filenameToVarnameMap[f]!), map: varnameToNodeMap,
-        watchFiles: Object.keys(filenameToNodeMap),
+        watchFiles: [...fileToDepsPlaceholderMap.keys()],
     };
 }
 async function getFile(where: IncludePlaceholder, sourceMap: Record<string, string>, nodeMap: Record<string, AST.Node>): Promise<IncludePlaceholder[]> {

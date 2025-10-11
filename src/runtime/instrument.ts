@@ -1,5 +1,5 @@
-import { CompileState } from "../compiler/prog";
-import { Synth } from "./synth";
+import { CompiledVoiceData } from "../compiler/prog";
+import { WorkletSynth } from "./synthImpl";
 import { PassMode, Tone } from "./tone";
 
 export class Instrument {
@@ -13,9 +13,9 @@ export class Instrument {
     rb = new Float32Array();
     constructor(
         public dt: number,
-        public synth: Synth,
-        public voiceTemplate: CompileState,
-        fxDef: CompileState
+        public synth: WorkletSynth,
+        public voiceTemplate: CompiledVoiceData,
+        fxDef: CompiledVoiceData
     ) {
         this.fx = new Tone(fxDef, dt, synth, 1, 1);
     }

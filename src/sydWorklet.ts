@@ -1,2 +1,2 @@
-import { SydWorklet } from "./worklet/worklet";
+import { SydWorklet } from "./worklet";
 registerProcessor("syd", SydWorklet);

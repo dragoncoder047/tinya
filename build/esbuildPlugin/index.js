@@ -27,7 +27,7 @@ import {
   isinstance,
   parse,
   str
-} from "../chunk-IACEQXWF.js";
+} from "../chunk-HMJMCDWR.js";
 
 // src/esbuildPlugin/include.ts
 import { readFileSync } from "node:fs";
@@ -63,7 +63,7 @@ async function include(entrypoint, outSourceFileMap) {
     const sm1 = stack.slice(1);
     const errTrace = sm1.map((t) => new ErrorNote("note: included from here:", t.loc));
     if (!curIP.exists) {
-      throw new ParseError("no such file " + str(curFile), curIP.loc, errTrace);
+      throw new ParseError("no such file " + str(curFile), stack[0].loc, errTrace.slice(0, -1));
     }
     if (sm1.some((t) => t.filename === curFile)) {
       throw new ParseError(errTrace.length > 1 ? "circular #!include" : "file #!include's itself", stack[0].loc, errTrace.slice(0, -1));
@@ -92,7 +92,7 @@ async function include(entrypoint, outSourceFileMap) {
   return {
     order: orderFiles.map((f) => filenameToVarnameMap[f]),
     map: varnameToNodeMap,
-    watchFiles: Object.keys(filenameToNodeMap)
+    watchFiles: [...fileToDepsPlaceholderMap.keys()]
   };
 }
 __name(include, "include");
@@ -231,7 +231,8 @@ async function toJSFile(filename) {
     src: `import { ${[...neededNames.values()].join(", ")} } from "syd";
 
 export const sources = /* @__PURE__ */ {
-    ${Object.entries(files).map(([name, source]) => str(name) + ":\n" + indent(str(source.split("\n"), null, 4))).join(",\n    ")}
+    ${Object.entries(files).map(([name, source]) => `${str(name)}:
+${indent(str(source.split("\n"), null, 4))}.join("\\n")`).join(",\n    ")}
 };
 
 ${getInternedStrings()}

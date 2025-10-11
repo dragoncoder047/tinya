@@ -31,9 +31,9 @@ export enum Opcode {
     GET_MOD,
 }
 
-export type Program = (Opcode | number | string)[];
+export type Program = (Opcode | number | string | [number, number])[];
 
-export interface CompileState {
+export interface CompiledVoiceData {
     p: Program;
     r: string[];
     nn: string[];
@@ -41,15 +41,15 @@ export interface CompileState {
     mods: [name: string, initial: number, mode: AutomatedValueMethod][]
 }
 
-export function allocRegister(name: string, state: CompileState): number {
+export function allocRegister(name: string, state: CompiledVoiceData): number {
     const i = state.r.indexOf(name);
     if (i === -1) return state.r.push(name) - 1;
     return i;
 }
-export function allocNode(name: string, state: CompileState): number {
+export function allocNode(name: string, state: CompiledVoiceData): number {
     return state.nn.push(name) - 1;
 }
 
-export function allocMod(name: string, state: CompileState, initial: number, mode: AutomatedValueMethod): number {
+export function allocMod(name: string, state: CompiledVoiceData, initial: number, mode: AutomatedValueMethod): number {
     return state.mods.push([name, initial, mode]) - 1;
 }

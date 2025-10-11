@@ -1,12 +1,13 @@
 import {
-  nodes
-} from "./chunk-P7H6OUTQ.js";
+  nodes,
+  passthroughFx
+} from "./chunk-YO3MNY3H.js";
 import {
   OPERATORS,
   __name,
   isArray,
   isNumber
-} from "./chunk-IACEQXWF.js";
+} from "./chunk-HMJMCDWR.js";
 
 // src/runtime/automation.ts
 var AutomatedValue = class {
@@ -63,9 +64,6 @@ var Tone = class {
     this.expression = new AutomatedValue(expression, 1 /* EXPONENTIAL */);
     this.mods = state.mods.map(([_, initial, mode]) => new AutomatedValue(initial, mode));
     this.modToIndexMap = Object.fromEntries(state.mods.map((m, i) => [m[0], i]));
-    if (state.tosStereo) {
-      this.p.push(15 /* STEREO_DOUBLE_WIDEN */);
-    }
   }
   static {
     __name(this, "Tone");
@@ -77,7 +75,7 @@ var Tone = class {
   ac = [];
   acL = [];
   acR = [];
-  tmp = null;
+  tmp = [0, 0];
   pitch;
   expression;
   mods;
@@ -86,7 +84,7 @@ var Tone = class {
   /** SCREAMING HOT CODE */
   processSample(sampleNo, l, r, mode, gate, gain) {
     const stack = this.sc;
-    const args = this.sc;
+    const args = this.ac;
     const argsL = this.acL;
     const argsR = this.acR;
     const prog = this.p;
@@ -95,9 +93,9 @@ var Tone = class {
     const tmp = this.tmp;
     const pitch = this.pitch.value;
     const expression = this.expression.value;
-    const push = /* @__PURE__ */ __name((x) => stack[sp++] = x, "push");
-    const pop = /* @__PURE__ */ __name(() => stack[sp--], "pop");
-    const peek = /* @__PURE__ */ __name(() => stack[sp], "peek");
+    const push = /* @__PURE__ */ __name((x) => stack.push(x), "push");
+    const pop = /* @__PURE__ */ __name(() => stack.pop(), "pop");
+    const peek = /* @__PURE__ */ __name(() => stack.at(-1), "peek");
     const next = /* @__PURE__ */ __name(() => prog[pc++], "next");
     var pc, sp, a, b, c, i;
     stack.length = args.length = argsL.length = argsR.length = pc = sp = 0;
@@ -165,24 +163,25 @@ var Tone = class {
           push([a, a]);
           break;
         case 16 /* APPLY_NODE */:
-          a = pop();
-          c = pop();
-          args.length = c;
-          i = 0;
-          while (i < c) args[i++] = pop();
+          a = next();
+          i = args.length = next();
+          while (i > 0) {
+            i--;
+            args[i] = pop();
+          }
           push(nodes2[a](this.dt, args));
           break;
         case 18 /* GET_MOD */:
           push(this.mods[next()]?.value ?? 0);
           break;
         case 17 /* APPLY_DOUBLE_NODE_STEREO */:
-          a = pop();
-          b = pop();
-          c = pop();
-          argsL.length = argsR.length = c;
-          i = 0;
-          while (i < c) args[i++] = pop();
-          i = 0;
+          a = next();
+          b = next();
+          i = args.length = argsL.length = argsR.length = c = next();
+          while (i > 0) {
+            i--;
+            args[i] = pop();
+          }
           while (i < c) {
             if (isArray(args[i])) {
               argsL[i] = args[i][0];
@@ -199,6 +198,11 @@ var Tone = class {
       }
     }
     a = pop();
+    if (!isArray(a)) {
+      tmp.length = 2;
+      tmp[0] = tmp[1] = a;
+      a = tmp;
+    }
     if (isNumber(a[0]) && isNaN(a[0])) a[0] = 0;
     if (isNumber(a[0]) && isNaN(a[1])) a[1] = 0;
     switch (mode) {
@@ -308,25 +312,39 @@ function gainForChord(chordSize) {
 }
 __name(gainForChord, "gainForChord");
 
-// src/runtime/synth.ts
-var Synth = class {
-  constructor(dt, nodes2, instruments, postFX) {
+// src/runtime/synthImpl.ts
+var WorkletSynth = class {
+  constructor(dt) {
     this.dt = dt;
-    this.nodes = nodes2;
-    for (var [tt, fxt] of instruments) {
-      this.instruments.push(new Instrument(dt, this, tt, fxt));
-    }
-    this.postFX = new Tone(postFX, dt, this, 1, 0.3);
+    this.clearAll();
   }
   static {
-    __name(this, "Synth");
+    __name(this, "WorkletSynth");
   }
   instruments = [];
-  postFX;
+  postFX = null;
   n2i = {};
   waves = {};
+  nodes = nodes();
+  volume = 0.8;
+  clearAll() {
+    this.instruments = [];
+    this.postFX = new Tone(passthroughFx(), this.dt, this, 0, 1);
+  }
   addWave(name, wave) {
     this.waves[name] = wave;
+  }
+  addInstrument(voiceDef, fxDef) {
+    return this.instruments.push(new Instrument(this.dt, this, voiceDef, fxDef)) - 1;
+  }
+  setPostFX(fxDef) {
+    this.postFX = new Tone(fxDef, this.dt, this, 1, 1);
+  }
+  setVolume(volume) {
+    this.volume = volume;
+  }
+  getInstrumentCount() {
+    return this.instruments.length;
   }
   _ifn(noteID) {
     return this.instruments[this.n2i[noteID]];
@@ -354,56 +372,33 @@ var Synth = class {
     for (var i = 0; i < instruments.length; i++) {
       instruments[i].process(left, right);
     }
+    this.postFX?.processBlock(left, right, 0 /* SET */, true, this.volume);
   }
 };
 
-// src/worklet/worklet.ts
+// src/worklet/index.ts
 var SydWorklet = class extends AudioWorkletProcessor {
   static {
     __name(this, "SydWorklet");
   }
-  s = null;
-  dt;
-  constructor(sampleRate) {
+  synth = new WorkletSynth(1 / sampleRate);
+  constructor() {
     super();
-    this.dt = 1 / (sampleRate ?? globalThis.sampleRate);
-    this.port.addEventListener("message", (e) => this.processMessage(e.data));
+    this.port.onmessage = (e) => this.handleMessage(e.data);
+    console.log("[audio worklet thread] setup message handler");
   }
-  processMessage(m) {
-    switch (m[0]) {
-      case 0 /* SETUP_SYNTH */:
-        this.s = new Synth(this.dt, nodes(), m[1], m[2]);
-        return;
-    }
-    const s = this.s;
-    switch (m[0]) {
-      case 1 /* ADD_WAVETABLE */:
-        s.addWave(m[1], m[2]);
-        break;
-      case 2 /* NOTE_ON */:
-        s.noteOn(m[1], m[2], m[3], m[4]);
-        break;
-      case 3 /* NOTE_OFF */:
-        s.noteOff(m[1]);
-        break;
-      case 6 /* AUTOMATE */:
-        s.automate(m[1], m[2], m[3], m[4]);
-        break;
-      case 4 /* PITCH_BEND */:
-        if (m[1]) s.pitchBend(m[2], m[3], m[4]);
-        else s.postFX.pitch.goto(m[2], m[3], m[4]);
-        break;
-      case 5 /* EXPRESSION */:
-        if (m[1]) s.expressionBend(m[2], m[3], m[4]);
-        else s.postFX.expression.goto(m[2], m[3], m[4]);
-        break;
-      default:
-        m[0];
+  async handleMessage(m) {
+    try {
+      console.log("[audio worklet thread] received message", m);
+      const result = await this.synth[m.method](...m.args);
+      this.port.postMessage({ id: m.id, result, failed: false });
+    } catch (e) {
+      this.port.postMessage({ id: m.id, result: e, failed: true });
     }
   }
   process(input, out) {
     if (out.length > 0)
-      this.s.process(out[0][0], out[0][1]);
+      this.synth?.process(out[0][0], out[0][1]);
     return true;
   }
 };
