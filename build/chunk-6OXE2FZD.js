@@ -314,6 +314,9 @@ var OPERATORS = {
   // bitwise OR / XOR
   "|": op(6).code((a, b) => a | b),
   "^": op(6).code((a, b) => a ^ b),
+  // bit shifting (slightly before other bitwise to match C)
+  ">>": op(5.9).code((a, b) => a >> b),
+  "<<": op(5.9).code((a, b) => a << b),
   // comparison
   "==": op(7).code((a, b) => a == b),
   ">=": op(7).code((a, b) => a >= b),
@@ -1071,7 +1074,7 @@ __name(scopeForName, "scopeForName");
 function compileNode(node, state, cache, ni) {
   if (isinstance(node, Value)) {
     node.compile(state);
-    return;
+    return state;
   }
   const entry = cache.get(node);
   const regname = "" + id(node);
@@ -1709,4 +1712,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-KJLP6I25.js.map
+//# sourceMappingURL=chunk-6OXE2FZD.js.map

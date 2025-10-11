@@ -1,13 +1,13 @@
 import {
   nodes,
   passthroughFx
-} from "./chunk-J2FQLSRR.js";
+} from "./chunk-ORYACBB6.js";
 import {
   OPERATORS,
   __name,
   isArray,
   isNumber
-} from "./chunk-KJLP6I25.js";
+} from "./chunk-6OXE2FZD.js";
 
 // src/runtime/automation.ts
 var AutomatedValue = class {
@@ -75,7 +75,6 @@ var Tone = class {
   ac = [];
   acL = [];
   acR = [];
-  sTmp = [0, 0];
   pitch;
   expression;
   mods;
@@ -90,16 +89,13 @@ var Tone = class {
     const prog = this.p;
     const registers = this.r;
     const nodes2 = this.n;
-    const tmp = this.sTmp;
     const pitch = this.pitch.value;
     const expression = this.expression.value;
     const push = /* @__PURE__ */ __name((x) => (stack[sp] = x, sp++), "push");
     const pop = /* @__PURE__ */ __name(() => (sp--, stack[sp]), "pop");
     const peek = /* @__PURE__ */ __name(() => stack[sp - 1], "peek");
     const stereo = /* @__PURE__ */ __name((a2, b2) => {
-      tmp[0] = a2;
-      tmp[1] = b2;
-      return tmp;
+      return [a2, b2];
     }, "stereo");
     var sp, a, b, c, i;
     stack.length = args.length = argsL.length = argsR.length = sp = 0;

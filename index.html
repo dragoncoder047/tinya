@@ -25,8 +25,10 @@
         <h1>Syd test</h1>
         <p><a href="https://github.com/dragoncoder047/syd?tab=readme-ov-file">(What is this?)</a></p>
         <p><button id="play">Play</button></p>
-        <p>Instrument: <textarea id="instrument" rows="2"
-                cols="100">(a = zzfxOscillator(200, shape: .triangle) + 0.1), [a, -a]</textarea></p>
+        <p>Instrument: <textarea id="instrument" rows="4" cols="100">s = (s+1) % 6; t += (s == 0);
+// "42" melody
+t*(42&t>>10)
+|> (# & 255) / 512</textarea></p>
         <canvas id="oscilloscope" width="800" height="200"></canvas>
         <div id="log"></div>
         <script type="module">
@@ -56,7 +58,8 @@
             splitter.connect(fftR, 1);
 
             synth.audioNode.onprocessorerror = e => {
-                showError("Synth died unexpectedly.");
+                showError("Synth died unexpectedly: " + e);
+                console.log(e);
             };
 
             bind("#instrument", "input", debounce(300, async () => {
@@ -69,11 +72,14 @@
                     const env = await makeEnv();
                     const ast = await syd.parse(src, dummyName);
                     const evaled = await ast.eval(env);
+                    console.log("Evaled", evaled);
                     const compiled = syd.compileNode(evaled, syd.newCompileData(), new Map, syd.nodes());
+                    console.log("Final program", compiled)
                     showLog(syd.disassemble(compiled));
                     await synth.setPostFX(compiled);
                 } catch (e) {
                     showError(e instanceof syd.SydError ? e.displayOn(fs) : e.stack);
+                    throw e;
                 }
             }));
 
@@ -97,7 +103,7 @@
             function started() {
                 audio.resume();
                 showLog("Started audio");
-                setInterval(drawOscilloscope, 200);
+                drawOscilloscope();
             }
 
             function showLog(logText) {
@@ -113,6 +119,7 @@
             const samplesL = new Float32Array(fftL.fftSize);
             const samplesR = new Float32Array(fftR.fftSize);
             function drawOscilloscope() {
+                requestAnimationFrame(drawOscilloscope);
                 fftL.getFloatTimeDomainData(samplesL);
                 fftR.getFloatTimeDomainData(samplesR);
                 drawSamples(samplesL, samplesR, canvas, gfx);

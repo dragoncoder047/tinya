@@ -53,6 +53,9 @@ export const OPERATORS: Record<string, Operator> = {
     // bitwise OR / XOR
     "|": op(6).code((a, b) => a | b),
     "^": op(6).code((a, b) => a ^ b),
+    // bit shifting (slightly before other bitwise to match C)
+    ">>": op(5.9).code((a, b) => a >> b),
+    "<<": op(5.9).code((a, b) => a << b),
     // comparison
     "==": op(7).code((a, b) => a == b),
     ">=": op(7).code((a, b) => a >= b),

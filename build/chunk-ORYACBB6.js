@@ -26,7 +26,7 @@ import {
   str,
   tan,
   tri
-} from "./chunk-KJLP6I25.js";
+} from "./chunk-6OXE2FZD.js";
 
 // src/lib/index.syd
 var sources = {
@@ -765,4 +765,4 @@ export {
   disassemble,
   initWorklet
 };
-//# sourceMappingURL=chunk-J2FQLSRR.js.map
+//# sourceMappingURL=chunk-ORYACBB6.js.map

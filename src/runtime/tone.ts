@@ -18,7 +18,6 @@ export class Tone {
     ac: any[] = [];
     acL: any[] = [];
     acR: any[] = [];
-    sTmp: [number, number] = [0, 0];
     pitch: AutomatedValue;
     expression: AutomatedValue;
     mods: AutomatedValue[];
@@ -53,7 +52,6 @@ export class Tone {
         const prog = this.p;
         const registers = this.r;
         const nodes = this.n;
-        const tmp = this.sTmp;
         const pitch = this.pitch.value;
         const expression = this.expression.value;
 
@@ -61,9 +59,7 @@ export class Tone {
         const pop = () => (sp--, stack[sp]);
         const peek = () => stack[sp - 1];
         const stereo = (a: number, b: number) => {
-            tmp[0] = a;
-            tmp[1] = b;
-            return tmp;
+            return [a, b];
         }
 
         var sp: number, a, b, c, i;

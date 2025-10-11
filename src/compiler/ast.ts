@@ -513,10 +513,10 @@ type ResultCacheEntry = [
     stereo: boolean, // whether node said top of stack was stereo
 ];
 
-export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Node, ResultCacheEntry>, ni: NodeDef[]): CompiledVoiceData {
     if (isinstance(node, Value)) {
         node.compile(state);
-        return;
+        return state;
     }
     const entry = cache.get(node);
     const regname = "" + id(node);

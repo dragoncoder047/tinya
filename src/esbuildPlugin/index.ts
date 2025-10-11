@@ -1,5 +1,4 @@
 import type { PluginBuild } from "esbuild";
-import { basename, dirname } from "node:path";
 import { toJSFile } from "./tojs";
 
 export function sydPlugin() {
