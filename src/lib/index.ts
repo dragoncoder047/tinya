@@ -32,19 +32,9 @@ export function baseEnv(): EvalState {
     };
 }
 
-export function newCompileData(): CompiledVoiceData {
-    return {
-        p: [],
-        r: [],
-        nn: [],
-        tosStereo: false,
-        mods: [],
-    }
-}
-
 export function silenceInstrument(): CompiledVoiceData {
     return {
-        p: [Opcode.PUSH_CONSTANT, [0, 0]],
+        p: [[Opcode.PUSH_CONSTANT, [0, 0]]],
         r: [],
         nn: [],
         tosStereo: true,
@@ -53,7 +43,7 @@ export function silenceInstrument(): CompiledVoiceData {
 }
 export function passthroughFx(): CompiledVoiceData {
     return {
-        p: [Opcode.PUSH_INPUT_SAMPLES],
+        p: [[Opcode.PUSH_INPUT_SAMPLES]],
         r: [],
         nn: [],
         tosStereo: true,

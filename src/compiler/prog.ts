@@ -14,8 +14,10 @@ export enum Opcode {
     EXTEND_TO_LIST,
     /** next is opcode */
     DO_BINARY_OP,
+    DO_BINARY_OP_STEREO,
     /** next is opcode */
     DO_UNARY_OP,
+    DO_UNARY_OP_STEREO,
     /** next is register no. */
     GET_REGISTER,
     /** next is register no. */

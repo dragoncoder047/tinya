@@ -26,7 +26,9 @@ export function disassemble(data: CompiledVoiceData): string {
             case Opcode.EXTEND_TO_LIST:
                 break;
             case Opcode.DO_BINARY_OP:
+            case Opcode.DO_BINARY_OP_STEREO:
             case Opcode.DO_UNARY_OP:
+            case Opcode.DO_UNARY_OP_STEREO:
             case Opcode.GET_REGISTER:
             case Opcode.TAP_REGISTER:
                 arg = [str(command[1])];

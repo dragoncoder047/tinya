@@ -5,7 +5,6 @@ import { RuntimeError, ErrorNote, LocationTrace } from "./errors";
 
 export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, site: LocationTrace, args: AST.Node[], nodeImpl: NodeDef) {
     const newArgs: (AST.Node | null)[] = nodeImpl[1].map(arg => arg[1] !== null ? new AST.Value(site, arg[1]) : null);
-    console.log("initial args", newArgs.slice());
     const seenArgs: (AST.Node | null)[] = newArgs.map(_ => null);
     var firstKW: AST.Node | undefined;
     for (var i = 0; i < args.length; i++) {
@@ -64,6 +63,5 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
             throw new RuntimeError(`missing value for argument ${argEntry[0]}`, site, AST.stackToNotes(state.callstack));
         }
     }
-    console.log("final args", newArgs.slice());
     return newArgs as AST.Node[];
 }

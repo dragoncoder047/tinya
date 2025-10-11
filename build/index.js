@@ -3,13 +3,12 @@ import {
   compileInstrument,
   disassemble,
   initWorklet,
-  newCompileData,
   newEnv,
   newSynth,
   nodeHelp,
   nodes,
   sources
-} from "./chunk-6LS5Z76T.js";
+} from "./chunk-MOFQH45R.js";
 import {
   AnnotatedValue,
   Assignment,
@@ -41,9 +40,11 @@ import {
   UnaryOp,
   Value,
   ast_exports,
+  compileNode,
+  newCompileData,
   parse,
   stackToNotes
-} from "./chunk-HB3HG7EN.js";
+} from "./chunk-OLQY34MG.js";
 export {
   ast_exports as AST,
   AnnotatedValue,
@@ -77,6 +78,7 @@ export {
   Value,
   baseEnv,
   compileInstrument,
+  compileNode,
   disassemble,
   initWorklet,
   sources as libSrc,

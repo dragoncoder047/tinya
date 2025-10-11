@@ -69,7 +69,7 @@
                     const env = await makeEnv();
                     const ast = await syd.parse(src, dummyName);
                     const evaled = await ast.eval(env);
-                    const compiled = evaled.compile(syd.newCompileData(), syd.nodes());
+                    const compiled = syd.compileNode(evaled, syd.newCompileData(), new Map, syd.nodes());
                     showLog(syd.disassemble(compiled));
                     await synth.setPostFX(compiled);
                 } catch (e) {

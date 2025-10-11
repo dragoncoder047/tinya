@@ -1,4 +1,4 @@
-export { baseEnv, newCompileData, nodes, nodeHelp, libSrc, newEnv, compileInstrument } from "./lib";
+export { baseEnv, nodes, nodeHelp, libSrc, newEnv, compileInstrument } from "./lib";
 export * from "./compiler/ast";
 export * as AST from "./compiler/ast";
 export { SydError, ErrorNote, LocationTrace, ParseError, CompileError, RuntimeError } from "./compiler/errors";

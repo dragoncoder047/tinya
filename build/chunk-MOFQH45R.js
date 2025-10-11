@@ -26,7 +26,7 @@ import {
   str,
   tan,
   tri
-} from "./chunk-HB3HG7EN.js";
+} from "./chunk-OLQY34MG.js";
 
 // src/lib/index.syd
 var sources = {
@@ -614,19 +614,9 @@ function baseEnv() {
   };
 }
 __name(baseEnv, "baseEnv");
-function newCompileData() {
-  return {
-    p: [],
-    r: [],
-    nn: [],
-    tosStereo: false,
-    mods: []
-  };
-}
-__name(newCompileData, "newCompileData");
 function passthroughFx() {
   return {
-    p: [1 /* PUSH_INPUT_SAMPLES */],
+    p: [[1 /* PUSH_INPUT_SAMPLES */]],
     r: [],
     nn: [],
     tosStereo: true,
@@ -726,21 +716,23 @@ function disassemble(data) {
       case 9 /* EXTEND_TO_LIST */:
         break;
       case 10 /* DO_BINARY_OP */:
-      case 11 /* DO_UNARY_OP */:
-      case 12 /* GET_REGISTER */:
-      case 13 /* TAP_REGISTER */:
+      case 11 /* DO_BINARY_OP_STEREO */:
+      case 12 /* DO_UNARY_OP */:
+      case 13 /* DO_UNARY_OP_STEREO */:
+      case 14 /* GET_REGISTER */:
+      case 15 /* TAP_REGISTER */:
         arg = [str(command[1])];
         break;
-      case 14 /* CONDITIONAL_SELECT */:
-      case 15 /* STEREO_DOUBLE_WIDEN */:
+      case 16 /* CONDITIONAL_SELECT */:
+      case 17 /* STEREO_DOUBLE_WIDEN */:
         break;
-      case 16 /* APPLY_NODE */:
+      case 18 /* APPLY_NODE */:
         arg = [nNode(command[1]), str(command[2]) + " args"];
         break;
-      case 18 /* GET_MOD */:
+      case 20 /* GET_MOD */:
         arg = [str(command[1])];
         break;
-      case 17 /* APPLY_DOUBLE_NODE_STEREO */:
+      case 19 /* APPLY_DOUBLE_NODE_STEREO */:
         arg = [nNode(command[1]), nNode(command[2]), str(command[1]) + " args"];
         break;
       default:
@@ -765,7 +757,6 @@ export {
   sources,
   nodes,
   baseEnv,
-  newCompileData,
   passthroughFx,
   nodeHelp,
   newEnv,
@@ -774,4 +765,4 @@ export {
   disassemble,
   initWorklet
 };
-//# sourceMappingURL=chunk-6LS5Z76T.js.map
+//# sourceMappingURL=chunk-MOFQH45R.js.map

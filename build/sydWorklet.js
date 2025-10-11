@@ -1,13 +1,13 @@
 import {
   nodes,
   passthroughFx
-} from "./chunk-6LS5Z76T.js";
+} from "./chunk-MOFQH45R.js";
 import {
   OPERATORS,
   __name,
   isArray,
   isNumber
-} from "./chunk-HB3HG7EN.js";
+} from "./chunk-OLQY34MG.js";
 
 // src/runtime/automation.ts
 var AutomatedValue = class {
@@ -75,7 +75,7 @@ var Tone = class {
   ac = [];
   acL = [];
   acR = [];
-  tmp = [0, 0];
+  sTmp = [0, 0];
   pitch;
   expression;
   mods;
@@ -90,12 +90,17 @@ var Tone = class {
     const prog = this.p;
     const registers = this.r;
     const nodes2 = this.n;
-    const tmp = this.tmp;
+    const tmp = this.sTmp;
     const pitch = this.pitch.value;
     const expression = this.expression.value;
-    const push = /* @__PURE__ */ __name((x) => stack.push(x), "push");
-    const pop = /* @__PURE__ */ __name(() => stack.pop(), "pop");
-    const peek = /* @__PURE__ */ __name(() => stack.at(-1), "peek");
+    const push = /* @__PURE__ */ __name((x) => (stack[sp] = x, sp++), "push");
+    const pop = /* @__PURE__ */ __name(() => (sp--, stack[sp]), "pop");
+    const peek = /* @__PURE__ */ __name(() => stack[sp - 1], "peek");
+    const stereo = /* @__PURE__ */ __name((a2, b2) => {
+      tmp[0] = a2;
+      tmp[1] = b2;
+      return tmp;
+    }, "stereo");
     var sp, a, b, c, i;
     stack.length = args.length = argsL.length = argsR.length = sp = 0;
     for (var pc = 0; pc < prog.length; pc++) {
@@ -106,10 +111,7 @@ var Tone = class {
           push(code[1]);
           break;
         case 1 /* PUSH_INPUT_SAMPLES */:
-          tmp.length = 2;
-          tmp[0] = l[sampleNo];
-          tmp[1] = r[sampleNo];
-          push(tmp);
+          push(stereo(l[sampleNo], r[sampleNo]));
           break;
         case 2 /* PUSH_PITCH */:
           push(pitch);
@@ -138,31 +140,35 @@ var Tone = class {
           peek().push(...a);
           break;
         case 10 /* DO_BINARY_OP */:
+        case 11 /* DO_BINARY_OP_STEREO */:
           b = pop();
           a = pop();
-          push(OPERATORS[code[1]].cb(a, b));
+          c = OPERATORS[code[1]].cb;
+          push(op === 10 /* DO_BINARY_OP */ ? c(a, b) : stereo(c(a[0], b[0]), c(a[1], b[1])));
           break;
-        case 11 /* DO_UNARY_OP */:
+        case 12 /* DO_UNARY_OP */:
+        case 13 /* DO_UNARY_OP_STEREO */:
           a = pop();
-          push(OPERATORS[code[1]].cu(a));
+          c = OPERATORS[code[1]].cu;
+          push(op === 12 /* DO_UNARY_OP */ ? c(a) : stereo(c(a[0]), c(a[1])));
           break;
-        case 12 /* GET_REGISTER */:
+        case 14 /* GET_REGISTER */:
           push(registers[code[1]]);
           break;
-        case 13 /* TAP_REGISTER */:
+        case 15 /* TAP_REGISTER */:
           registers[code[1]] = peek();
           break;
-        case 14 /* CONDITIONAL_SELECT */:
+        case 16 /* CONDITIONAL_SELECT */:
           c = pop();
           b = pop();
           a = pop();
           push(c ? b : a);
           break;
-        case 15 /* STEREO_DOUBLE_WIDEN */:
+        case 17 /* STEREO_DOUBLE_WIDEN */:
           a = pop();
-          push([a, a]);
+          push(stereo(a, a));
           break;
-        case 16 /* APPLY_NODE */:
+        case 18 /* APPLY_NODE */:
           a = code[1];
           i = args.length = code[2];
           while (i > 0) {
@@ -171,10 +177,10 @@ var Tone = class {
           }
           push(nodes2[a](this.dt, args));
           break;
-        case 18 /* GET_MOD */:
+        case 20 /* GET_MOD */:
           push(this.mods[code[1]]?.value ?? 0);
           break;
-        case 17 /* APPLY_DOUBLE_NODE_STEREO */:
+        case 19 /* APPLY_DOUBLE_NODE_STEREO */:
           a = code[1];
           b = code[2];
           i = args.length = argsL.length = argsR.length = c = code[3];
@@ -191,18 +197,14 @@ var Tone = class {
             }
             i++;
           }
-          push([nodes2[a](this.dt, argsL), nodes2[b](this.dt, argsR)]);
+          push(stereo(nodes2[a](this.dt, argsL), nodes2[b](this.dt, argsR)));
           break;
         default:
           op;
       }
     }
     a = pop();
-    if (!isArray(a)) {
-      tmp.length = 2;
-      tmp[0] = tmp[1] = a;
-      a = tmp;
-    }
+    if (!isArray(a)) a = stereo(a, a);
     if (isNumber(a[0]) && isNaN(a[0])) a[0] = 0;
     if (isNumber(a[0]) && isNaN(a[1])) a[1] = 0;
     switch (mode) {

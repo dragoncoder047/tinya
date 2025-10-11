@@ -1,4 +1,4 @@
-import { isinstance, str } from "../utils";
+import { id, isinstance, str } from "../utils";
 import { processArgsInCall } from "./call";
 import { makeCodeMacroExpander } from "./codemacro";
 import { CompileError, ErrorNote, LocationTrace, RuntimeError } from "./errors";
@@ -12,11 +12,11 @@ export abstract class Node {
     abstract edgemost(left: boolean): Node;
     abstract pipe(fn: (node: Node) => Promise<Node>): Promise<Node>;
     abstract eval(state: EvalState): Promise<Node>;
-    abstract compile(state: CompiledVoiceData, ni: NodeDef[]): CompiledVoiceData;
+    abstract compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]): void;
 }
 
 export abstract class NotCodeNode extends Node {
-    compile(state: CompiledVoiceData): CompiledVoiceData {
+    compile(state: CompiledVoiceData) {
         throw new CompileError("how did we get here ?!? (" + this.constructor.name + ")", this.loc);
     }
 }
@@ -66,7 +66,6 @@ export class Value extends Leaf {
     compile(state: CompiledVoiceData) {
         state.p.push([Opcode.PUSH_CONSTANT, this.value]);
         state.tosStereo = false;
-        return state;
     }
 }
 
@@ -94,10 +93,9 @@ export class Assignment extends Node {
         }
         return val;
     }
-    compile(state: CompiledVoiceData, ni: NodeDef[]) {
-        this.value.compile(state, ni);
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+        compileNode(this.value, state, refMap, ni);
         state.p.push([Opcode.TAP_REGISTER, allocRegister((this.target as any).name, state)]);
-        return state;
     }
 }
 
@@ -112,7 +110,6 @@ export class Name extends Leaf {
     }
     compile(state: CompiledVoiceData) {
         state.p.push([Opcode.GET_REGISTER, allocRegister(this.name, state)]);
-        return state;
     }
 }
 
@@ -143,7 +140,7 @@ export class Call extends Node {
         }
         return withHasCode(new Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl)));
     }
-    compile(state: CompiledVoiceData, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         var i: number;
         const nodeImpl = ni.find(n => n[0] === this.name);
         if (!nodeImpl) {
@@ -153,7 +150,7 @@ export class Call extends Node {
         const existingProg: Program = state.p;
         for (i = 0; i < this.args.length; i++) {
             state.p = [];
-            this.args[i]!.compile(state, ni);
+            compileNode(this.args[i]!, state, refMap, ni);
             argProgs.push([state.p, state.tosStereo ? NodeValueType.STEREO : NodeValueType.NORMAL_OR_MONO]);
         }
         state.p = existingProg;
@@ -193,7 +190,6 @@ export class Call extends Node {
             state.p.push(...argProgs[i]![0]);
         }
         state.p.push(callProg);
-        return state;
     }
 }
 
@@ -230,24 +226,22 @@ export class List extends Node {
     static fromImmediate(trace: LocationTrace, m: any[]): List | Value {
         return Array.isArray(m) ? new List(trace, m.map(r => List.fromImmediate(trace, r))) : new Value(trace, m);
     }
-    compile(state: CompiledVoiceData, ni: NodeDef[]) {
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         if (this.isImmediate()) {
             const imm = this.toImmediate() as any;
             state.p.push([Opcode.PUSH_CONSTANT, imm]);
         } else {
             state.p.push([Opcode.PUSH_FRESH_EMPTY_LIST]);
             for (var arg of this.values) {
+                compileNode(arg, state, refMap, ni);
                 if (isinstance(arg, SplatValue)) {
-                    arg.value.compile(state, ni);
                     state.p.push([Opcode.EXTEND_TO_LIST]);
                 } else {
-                    arg.compile(state, ni);
                     state.p.push([Opcode.APPEND_TO_LIST]);
                 }
             }
         }
         state.tosStereo = this.values.length === 2;
-        return state;
     }
 }
 
@@ -331,11 +325,17 @@ export class BinaryOp extends Node {
         const out = new BinaryOp(this.loc, this.op, left, right);
         return (left.hasNodes || right.hasNodes) ? withHasCode(out) : out;
     }
-    compile(state: CompiledVoiceData, ni: NodeDef[]) {
-        this.left.compile(state, ni);
-        this.right.compile(state, ni);
-        state.p.push([Opcode.DO_BINARY_OP, this.op]);
-        return state;
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+        compileNode(this.left, state, refMap, ni);
+        const aStereo = state.tosStereo;
+        const aIndex = state.p.length;
+        compileNode(this.right, state, refMap, ni);
+        const bStereo = state.tosStereo;
+        if ((state.tosStereo ||= aStereo)) {
+            if (!aStereo) state.p.splice(aIndex, 0, [Opcode.STEREO_DOUBLE_WIDEN]);
+            if (!bStereo) state.p.push([Opcode.STEREO_DOUBLE_WIDEN]);
+        }
+        state.p.push([state.tosStereo ? Opcode.DO_BINARY_OP_STEREO : Opcode.DO_BINARY_OP, this.op]);
     }
 }
 
@@ -362,10 +362,9 @@ export class UnaryOp extends Node {
         const out = new UnaryOp(this.loc, this.op, val);
         return val.hasNodes ? withHasCode(out) : out;
     }
-    compile(state: CompiledVoiceData, ni: NodeDef[]) {
-        this.value.compile(state, ni);
-        state.p.push([Opcode.DO_UNARY_OP, this.op]);
-        return state;
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+        compileNode(this.value, state, refMap, ni);
+        state.p.push([state.tosStereo ? Opcode.DO_UNARY_OP_STEREO : Opcode.DO_UNARY_OP, this.op]);
     }
 }
 
@@ -423,22 +422,21 @@ export class Conditional extends Node {
         const out = new Conditional(this.loc, cond, ct, cf);
         return anyHas ? withHasCode(out) : out;
     }
-    compile(state: CompiledVoiceData, ni: NodeDef[]) {
-        this.caseFalse.compile(state, ni);
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+        compileNode(this.caseFalse, state, refMap, ni);
         const stereoF = state.tosStereo;
         const stereoI = state.p.length;
-        this.caseTrue.compile(state, ni);
+        compileNode(this.caseTrue, state, refMap, ni);
         const stereoT = state.tosStereo;
         if ((state.tosStereo ||= stereoF)) {
             if (!stereoT) state.p.push([Opcode.STEREO_DOUBLE_WIDEN]);
             if (!stereoF) state.p.splice(stereoI, 0, [Opcode.STEREO_DOUBLE_WIDEN]);
         }
-        this.cond.compile(state, ni);
+        compileNode(this.cond, state, refMap, ni);
         if (state.tosStereo) {
             throw new CompileError("cannot use stereo output as condition", this.cond.loc);
         }
         state.p.push([Opcode.CONDITIONAL_SELECT]);
-        return state;
     }
 }
 
@@ -483,14 +481,13 @@ export class Block extends Node {
         if (hadNodes.length > 0) return withHasCode(new Block(this.loc, hadNodes));
         return last;
     }
-    compile(state: CompiledVoiceData, ni: NodeDef[]) {
-        for (var arg of this.body) {
-            arg.compile(state, ni);
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+        for (var statement of this.body) {
+            statement.compile(state, refMap, ni);
             state.p.push([Opcode.DROP_TOP]);
         }
         // *Don't* drop the last value
         state.p.pop();
-        return state;
     }
 }
 
@@ -508,4 +505,70 @@ export function stackToNotes(stack: Call[]): ErrorNote[] {
         out.push(new ErrorNote(`note: while evaluating function ${str(s.name)}`, s.loc));
     }
     return out.reverse();
+}
+
+export function newCompileData(): CompiledVoiceData {
+    return {
+        p: [],
+        r: [],
+        nn: [],
+        tosStereo: false,
+        mods: [],
+    }
+}
+
+type ResultCacheEntry = [
+    used: boolean, // whether this node is reffed multiple times
+    index: number | null, // index into prog to insert tap - defined if node is completed and tap must be spliced in
+    stereo: boolean, // whether node said top of stack was stereo
+];
+
+export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
+    if (isinstance(node, Leaf)) {
+        node.compile(state);
+        return;
+    }
+    const entry = cache.get(node);
+    const regname = "" + id(node);
+    console.group(node, regname);
+    if (entry) {
+        if (!entry[0]) {
+            entry[0] = true;
+            // haven't assigned a tap yet
+            console.log("--> no tap");
+            if (entry[1] !== null) {
+                console.log("  -->> diamond reference")
+                // ... but the node has been compiled in fully
+                state.p.splice(entry[1], 0, [Opcode.TAP_REGISTER, allocRegister(regname, state)]);
+                // update nodes further down the line after this in the program
+                for (var e of cache.values()) {
+                    if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
+                }
+            } else {
+                console.log("  -->> backreference")
+                // node has NOT been compiled in fully so tap point doesn't exist yet - this is a backreference!
+                // we don't need to adjust any indices
+            }
+        } else {
+            console.log("  -->> another reference")
+            // node's tap has been handled already or will be handled
+        }
+        state.p.push([Opcode.GET_REGISTER, allocRegister(regname, state)]);
+        state.tosStereo = entry[2];
+    }
+    else {
+        // New node
+        const myEntry: ResultCacheEntry = [false, null, false];
+        cache.set(node, myEntry);
+        // Do the thing
+        node.compile(state, cache, ni);
+        // Tap out if needed
+        if (myEntry[0]) {
+            console.log("  -->> was backreffed");
+            state.p.push([Opcode.TAP_REGISTER, allocRegister(regname, state)]);
+        }
+        myEntry[1] = state.p.length;
+    }
+    console.groupEnd();
+    return state;
 }

@@ -18,7 +18,7 @@ export class Tone {
     ac: any[] = [];
     acL: any[] = [];
     acR: any[] = [];
-    tmp: [number, number] = [0, 0];
+    sTmp: [number, number] = [0, 0];
     pitch: AutomatedValue;
     expression: AutomatedValue;
     mods: AutomatedValue[];
@@ -53,13 +53,18 @@ export class Tone {
         const prog = this.p;
         const registers = this.r;
         const nodes = this.n;
-        const tmp = this.tmp;
+        const tmp = this.sTmp;
         const pitch = this.pitch.value;
         const expression = this.expression.value;
 
-        const push = (x: any) => stack.push(x);//(stack[sp] = x, sp++);
-        const pop = () => stack.pop();//(sp--, stack[sp]);
-        const peek = () => stack.at(-1);//stack[sp - 1];
+        const push = (x: any) => (stack[sp] = x, sp++);
+        const pop = () => (sp--, stack[sp]);
+        const peek = () => stack[sp - 1];
+        const stereo = (a: number, b: number) => {
+            tmp[0] = a;
+            tmp[1] = b;
+            return tmp;
+        }
 
         var sp: number, a, b, c, i;
         stack.length = args.length = argsL.length = argsR.length = sp = 0;
@@ -72,10 +77,7 @@ export class Tone {
                     push(code[1]);
                     break;
                 case Opcode.PUSH_INPUT_SAMPLES:
-                    tmp.length = 2;
-                    tmp[0] = l[sampleNo]!;
-                    tmp[1] = r[sampleNo]!;
-                    push(tmp);
+                    push(stereo(l[sampleNo]!, r[sampleNo]!));
                     break;
                 case Opcode.PUSH_PITCH:
                     push(pitch);
@@ -104,13 +106,17 @@ export class Tone {
                     peek().push(...a);
                     break;
                 case Opcode.DO_BINARY_OP:
+                case Opcode.DO_BINARY_OP_STEREO:
                     b = pop();
                     a = pop();
-                    push(OPERATORS[code[1] as string]!.cb!(a, b));
+                    c = OPERATORS[code[1] as string]!.cb!;
+                    push(op === Opcode.DO_BINARY_OP ? c(a, b) : stereo(c(a[0], b[0]), c(a[1], b[1])));
                     break;
                 case Opcode.DO_UNARY_OP:
+                case Opcode.DO_UNARY_OP_STEREO:
                     a = pop();
-                    push(OPERATORS[code[1] as string]!.cu!(a));
+                    c = OPERATORS[code[1] as string]!.cu!;
+                    push(op === Opcode.DO_UNARY_OP ? c(a) : stereo(c(a[0]), c(a[1])));
                     break;
                 case Opcode.GET_REGISTER:
                     push(registers[code[1] as number]);
@@ -126,7 +132,7 @@ export class Tone {
                     break;
                 case Opcode.STEREO_DOUBLE_WIDEN:
                     a = pop();
-                    push([a, a]);
+                    push(stereo(a, a));
                     break;
                 case Opcode.APPLY_NODE:
                     a = code[1] as number;
@@ -157,18 +163,14 @@ export class Tone {
                         }
                         i++;
                     }
-                    push([nodes[a]!(this.dt, argsL), nodes[b]!(this.dt, argsR)]);
+                    push(stereo(nodes[a]!(this.dt, argsL), nodes[b]!(this.dt, argsR)));
                     break;
                 default:
                     op satisfies never;
             }
         }
         a = pop();
-        if (!isArray(a)) {
-            tmp.length = 2;
-            tmp[0] = tmp[1] = a;
-            a = tmp;
-        }
+        if (!isArray(a)) a = stereo(a, a);
         if (isNumber(a[0]) && isNaN(a[0])) a[0] = 0;
         if (isNumber(a[0]) && isNaN(a[1])) a[1] = 0;
         switch (mode) {

@@ -96,6 +96,8 @@ __export(ast_exports, {
   Template: () => Template,
   UnaryOp: () => UnaryOp,
   Value: () => Value,
+  compileNode: () => compileNode,
+  newCompileData: () => newCompileData,
   stackToNotes: () => stackToNotes
 });
 
@@ -109,11 +111,16 @@ function isinstance(obj, cls) {
   return obj instanceof cls;
 }
 __name(isinstance, "isinstance");
+var idMap = /* @__PURE__ */ new WeakMap();
+var idCounter = 0;
+var id = /* @__PURE__ */ __name((obj) => {
+  if (!idMap.has(obj)) idMap.set(obj, idCounter++);
+  return idMap.get(obj);
+}, "id");
 
 // src/compiler/call.ts
 async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
   const newArgs = nodeImpl[1].map((arg) => arg[1] !== null ? new Value(site, arg[1]) : null);
-  console.log("initial args", newArgs.slice());
   const seenArgs = newArgs.map((_) => null);
   var firstKW;
   for (var i = 0; i < args.length; i++) {
@@ -170,7 +177,6 @@ async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
       throw new RuntimeError(`missing value for argument ${argEntry[0]}`, site, stackToNotes(state.callstack));
     }
   }
-  console.log("final args", newArgs.slice());
   return newArgs;
 }
 __name(processArgsInCall, "processArgsInCall");
@@ -363,14 +369,16 @@ var Opcode = /* @__PURE__ */ ((Opcode2) => {
   Opcode2[Opcode2["APPEND_TO_LIST"] = 8] = "APPEND_TO_LIST";
   Opcode2[Opcode2["EXTEND_TO_LIST"] = 9] = "EXTEND_TO_LIST";
   Opcode2[Opcode2["DO_BINARY_OP"] = 10] = "DO_BINARY_OP";
-  Opcode2[Opcode2["DO_UNARY_OP"] = 11] = "DO_UNARY_OP";
-  Opcode2[Opcode2["GET_REGISTER"] = 12] = "GET_REGISTER";
-  Opcode2[Opcode2["TAP_REGISTER"] = 13] = "TAP_REGISTER";
-  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 14] = "CONDITIONAL_SELECT";
-  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 15] = "STEREO_DOUBLE_WIDEN";
-  Opcode2[Opcode2["APPLY_NODE"] = 16] = "APPLY_NODE";
-  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 17] = "APPLY_DOUBLE_NODE_STEREO";
-  Opcode2[Opcode2["GET_MOD"] = 18] = "GET_MOD";
+  Opcode2[Opcode2["DO_BINARY_OP_STEREO"] = 11] = "DO_BINARY_OP_STEREO";
+  Opcode2[Opcode2["DO_UNARY_OP"] = 12] = "DO_UNARY_OP";
+  Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 13] = "DO_UNARY_OP_STEREO";
+  Opcode2[Opcode2["GET_REGISTER"] = 14] = "GET_REGISTER";
+  Opcode2[Opcode2["TAP_REGISTER"] = 15] = "TAP_REGISTER";
+  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 16] = "CONDITIONAL_SELECT";
+  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 17] = "STEREO_DOUBLE_WIDEN";
+  Opcode2[Opcode2["APPLY_NODE"] = 18] = "APPLY_NODE";
+  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 19] = "APPLY_DOUBLE_NODE_STEREO";
+  Opcode2[Opcode2["GET_MOD"] = 20] = "GET_MOD";
   return Opcode2;
 })(Opcode || {});
 function allocRegister(name, state) {
@@ -471,7 +479,6 @@ var Value = class extends Leaf {
   compile(state) {
     state.p.push([0 /* PUSH_CONSTANT */, this.value]);
     state.tosStereo = false;
-    return state;
   }
 };
 var Symbol2 = class extends Leaf {
@@ -514,10 +521,9 @@ var Assignment = class _Assignment extends Node {
     }
     return val;
   }
-  compile(state, ni) {
-    this.value.compile(state, ni);
-    state.p.push([13 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
-    return state;
+  compile(state, refMap, ni) {
+    compileNode(this.value, state, refMap, ni);
+    state.p.push([15 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
   }
 };
 var Name = class extends Leaf {
@@ -536,8 +542,7 @@ var Name = class extends Leaf {
     return val;
   }
   compile(state) {
-    state.p.push([12 /* GET_REGISTER */, allocRegister(this.name, state)]);
-    return state;
+    state.p.push([14 /* GET_REGISTER */, allocRegister(this.name, state)]);
   }
 };
 var LateBinding = class extends Name {
@@ -580,7 +585,7 @@ var Call = class _Call extends Node {
     }
     return withHasCode(new _Call(this.loc, nodeImpl[0], await processArgsInCall(state, true, this.loc, this.args, nodeImpl)));
   }
-  compile(state, ni) {
+  compile(state, refMap, ni) {
     var i;
     const nodeImpl = ni.find((n) => n[0] === this.name);
     if (!nodeImpl) {
@@ -590,21 +595,21 @@ var Call = class _Call extends Node {
     const existingProg = state.p;
     for (i = 0; i < this.args.length; i++) {
       state.p = [];
-      this.args[i].compile(state, ni);
+      compileNode(this.args[i], state, refMap, ni);
       argProgs.push([state.p, state.tosStereo ? 1 /* STEREO */ : 0 /* NORMAL_OR_MONO */]);
     }
     state.p = existingProg;
-    const callProg = [16 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
+    const callProg = [18 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
     state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
     if (nodeImpl[1].every((a) => a[2] !== 1 /* STEREO */) && argProgs.some((s) => s[1] === 1 /* STEREO */)) {
       for (i = 0; i < nodeImpl[1].length; i++) {
         const gottenArgType = argProgs[i][1];
         if (gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push([15 /* STEREO_DOUBLE_WIDEN */]);
+          argProgs[i][0].push([17 /* STEREO_DOUBLE_WIDEN */]);
         }
       }
       state.tosStereo = true;
-      callProg[0] = 17 /* APPLY_DOUBLE_NODE_STEREO */;
+      callProg[0] = 19 /* APPLY_DOUBLE_NODE_STEREO */;
       callProg.splice(2, 0, allocNode(this.name, state));
     } else {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -613,7 +618,7 @@ var Call = class _Call extends Node {
         if (neededArgType !== 1 /* STEREO */ && gottenArgType === 1 /* STEREO */) {
           throw new CompileError("cannot implicitly convert stereo output to mono", this.args[i].loc);
         } else if (neededArgType === 1 /* STEREO */ && gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push([15 /* STEREO_DOUBLE_WIDEN */]);
+          argProgs[i][0].push([17 /* STEREO_DOUBLE_WIDEN */]);
         }
       }
       state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
@@ -622,7 +627,6 @@ var Call = class _Call extends Node {
       state.p.push(...argProgs[i][0]);
     }
     state.p.push(callProg);
-    return state;
   }
 };
 var List = class _List extends Node {
@@ -668,24 +672,22 @@ var List = class _List extends Node {
   static fromImmediate(trace, m) {
     return Array.isArray(m) ? new _List(trace, m.map((r) => _List.fromImmediate(trace, r))) : new Value(trace, m);
   }
-  compile(state, ni) {
+  compile(state, refMap, ni) {
     if (this.isImmediate()) {
       const imm = this.toImmediate();
       state.p.push([0 /* PUSH_CONSTANT */, imm]);
     } else {
       state.p.push([7 /* PUSH_FRESH_EMPTY_LIST */]);
       for (var arg of this.values) {
+        compileNode(arg, state, refMap, ni);
         if (isinstance(arg, SplatValue)) {
-          arg.value.compile(state, ni);
           state.p.push([9 /* EXTEND_TO_LIST */]);
         } else {
-          arg.compile(state, ni);
           state.p.push([8 /* APPEND_TO_LIST */]);
         }
       }
     }
     state.tosStereo = this.values.length === 2;
-    return state;
   }
 };
 var Definition = class _Definition extends NotCodeNode {
@@ -814,11 +816,17 @@ var BinaryOp = class _BinaryOp extends Node {
     const out = new _BinaryOp(this.loc, this.op, left, right);
     return left.hasNodes || right.hasNodes ? withHasCode(out) : out;
   }
-  compile(state, ni) {
-    this.left.compile(state, ni);
-    this.right.compile(state, ni);
-    state.p.push([10 /* DO_BINARY_OP */, this.op]);
-    return state;
+  compile(state, refMap, ni) {
+    compileNode(this.left, state, refMap, ni);
+    const aStereo = state.tosStereo;
+    const aIndex = state.p.length;
+    compileNode(this.right, state, refMap, ni);
+    const bStereo = state.tosStereo;
+    if (state.tosStereo ||= aStereo) {
+      if (!aStereo) state.p.splice(aIndex, 0, [17 /* STEREO_DOUBLE_WIDEN */]);
+      if (!bStereo) state.p.push([17 /* STEREO_DOUBLE_WIDEN */]);
+    }
+    state.p.push([state.tosStereo ? 11 /* DO_BINARY_OP_STEREO */ : 10 /* DO_BINARY_OP */, this.op]);
   }
 };
 var UnaryOp = class _UnaryOp extends Node {
@@ -855,10 +863,9 @@ var UnaryOp = class _UnaryOp extends Node {
     const out = new _UnaryOp(this.loc, this.op, val);
     return val.hasNodes ? withHasCode(out) : out;
   }
-  compile(state, ni) {
-    this.value.compile(state, ni);
-    state.p.push([11 /* DO_UNARY_OP */, this.op]);
-    return state;
+  compile(state, refMap, ni) {
+    compileNode(this.value, state, refMap, ni);
+    state.p.push([state.tosStereo ? 13 /* DO_UNARY_OP_STEREO */ : 12 /* DO_UNARY_OP */, this.op]);
   }
 };
 var DefaultPlaceholder = class extends Leaf {
@@ -948,22 +955,21 @@ var Conditional = class _Conditional extends Node {
     const out = new _Conditional(this.loc, cond, ct, cf);
     return anyHas ? withHasCode(out) : out;
   }
-  compile(state, ni) {
-    this.caseFalse.compile(state, ni);
+  compile(state, refMap, ni) {
+    compileNode(this.caseFalse, state, refMap, ni);
     const stereoF = state.tosStereo;
     const stereoI = state.p.length;
-    this.caseTrue.compile(state, ni);
+    compileNode(this.caseTrue, state, refMap, ni);
     const stereoT = state.tosStereo;
     if (state.tosStereo ||= stereoF) {
-      if (!stereoT) state.p.push([15 /* STEREO_DOUBLE_WIDEN */]);
-      if (!stereoF) state.p.splice(stereoI, 0, [15 /* STEREO_DOUBLE_WIDEN */]);
+      if (!stereoT) state.p.push([17 /* STEREO_DOUBLE_WIDEN */]);
+      if (!stereoF) state.p.splice(stereoI, 0, [17 /* STEREO_DOUBLE_WIDEN */]);
     }
-    this.cond.compile(state, ni);
+    compileNode(this.cond, state, refMap, ni);
     if (state.tosStereo) {
       throw new CompileError("cannot use stereo output as condition", this.cond.loc);
     }
-    state.p.push([14 /* CONDITIONAL_SELECT */]);
-    return state;
+    state.p.push([16 /* CONDITIONAL_SELECT */]);
   }
 };
 var InterpolatedValue = class _InterpolatedValue extends NotCodeNode {
@@ -1037,13 +1043,12 @@ var Block = class _Block extends Node {
     if (hadNodes.length > 0) return withHasCode(new _Block(this.loc, hadNodes));
     return last;
   }
-  compile(state, ni) {
-    for (var arg of this.body) {
-      arg.compile(state, ni);
+  compile(state, refMap, ni) {
+    for (var statement of this.body) {
+      statement.compile(state, refMap, ni);
       state.p.push([6 /* DROP_TOP */]);
     }
     state.p.pop();
-    return state;
   }
 };
 async function asyncNodePipe(nodes, fn) {
@@ -1063,6 +1068,56 @@ function stackToNotes(stack) {
   return out.reverse();
 }
 __name(stackToNotes, "stackToNotes");
+function newCompileData() {
+  return {
+    p: [],
+    r: [],
+    nn: [],
+    tosStereo: false,
+    mods: []
+  };
+}
+__name(newCompileData, "newCompileData");
+function compileNode(node, state, cache, ni) {
+  if (isinstance(node, Leaf)) {
+    node.compile(state);
+    return;
+  }
+  const entry = cache.get(node);
+  const regname = "" + id(node);
+  console.group(node, regname);
+  if (entry) {
+    if (!entry[0]) {
+      entry[0] = true;
+      console.log("--> no tap");
+      if (entry[1] !== null) {
+        console.log("  -->> diamond reference");
+        state.p.splice(entry[1], 0, [15 /* TAP_REGISTER */, allocRegister(regname, state)]);
+        for (var e of cache.values()) {
+          if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
+        }
+      } else {
+        console.log("  -->> backreference");
+      }
+    } else {
+      console.log("  -->> another reference");
+    }
+    state.p.push([14 /* GET_REGISTER */, allocRegister(regname, state)]);
+    state.tosStereo = entry[2];
+  } else {
+    const myEntry = [false, null, false];
+    cache.set(node, myEntry);
+    node.compile(state, cache, ni);
+    if (myEntry[0]) {
+      console.log("  -->> was backreffed");
+      state.p.push([15 /* TAP_REGISTER */, allocRegister(regname, state)]);
+    }
+    myEntry[1] = state.p.length;
+  }
+  console.groupEnd();
+  return state;
+}
+__name(compileNode, "compileNode");
 
 // src/compiler/tokenizer.ts
 var Token = class {
@@ -1665,7 +1720,9 @@ export {
   PipePlaceholder,
   Block,
   stackToNotes,
+  newCompileData,
+  compileNode,
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-HB3HG7EN.js.map
+//# sourceMappingURL=chunk-OLQY34MG.js.map
