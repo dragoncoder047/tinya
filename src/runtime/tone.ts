@@ -120,6 +120,11 @@ export class Tone {
                 case Opcode.TAP_REGISTER:
                     registers[code[1] as number] = peek();
                     break;
+                case Opcode.SHIFT_REGISTER:
+                    a = registers[code[1] as number];
+                    registers[code[1] as number] = pop();
+                    push(a);
+                    break;
                 case Opcode.CONDITIONAL_SELECT:
                     c = pop();
                     b = pop();

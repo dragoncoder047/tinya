@@ -26,7 +26,7 @@ import {
   str,
   tan,
   tri
-} from "./chunk-6OXE2FZD.js";
+} from "./chunk-7CNEPKY5.js";
 
 // src/lib/index.syd
 var sources = {
@@ -693,54 +693,88 @@ __name(makeSynthProxy, "makeSynthProxy");
 
 // src/runtime/disassemble.ts
 function disassemble(data) {
-  const outLines = [];
   const prog = data.p;
   const nNode = /* @__PURE__ */ __name((number) => {
     return `${number} (${data.nn[number]})`;
   }, "nNode");
+  const stack = [];
   for (var command of prog) {
     const opName = Opcode[command[0]];
     var arg = [];
+    var dependents = 0;
     switch (command[0]) {
+      // @ts-ignore
       case 0 /* PUSH_CONSTANT */:
         arg = [str(command[1])];
-        break;
       case 1 /* PUSH_INPUT_SAMPLES */:
       case 2 /* PUSH_PITCH */:
       case 3 /* PUSH_EXPRESSION */:
       case 4 /* PUSH_GATE */:
       case 5 /* MARK_STILL_ALIVE */:
+        dependents = 0;
+        break;
       case 6 /* DROP_TOP */:
+        dependents = 1;
+        break;
       case 7 /* PUSH_FRESH_EMPTY_LIST */:
+        dependents = 0;
+        break;
       case 8 /* APPEND_TO_LIST */:
       case 9 /* EXTEND_TO_LIST */:
+        dependents = 2;
         break;
       case 10 /* DO_BINARY_OP */:
       case 11 /* DO_BINARY_OP_STEREO */:
+        arg = [str(command[1])];
+        dependents = 2;
+        break;
       case 12 /* DO_UNARY_OP */:
       case 13 /* DO_UNARY_OP_STEREO */:
-      case 14 /* GET_REGISTER */:
-      case 15 /* TAP_REGISTER */:
         arg = [str(command[1])];
+        dependents = 1;
         break;
-      case 16 /* CONDITIONAL_SELECT */:
-      case 17 /* STEREO_DOUBLE_WIDEN */:
+      case 14 /* GET_REGISTER */:
+        arg = [str(command[1])];
+        dependents = 0;
         break;
-      case 18 /* APPLY_NODE */:
+      case 15 /* TAP_REGISTER */:
+      case 16 /* SHIFT_REGISTER */:
+        arg = [str(command[1])];
+        dependents = 1;
+        break;
+      case 17 /* CONDITIONAL_SELECT */:
+        dependents = 3;
+        break;
+      case 18 /* STEREO_DOUBLE_WIDEN */:
+        dependents = 1;
+        break;
+      case 19 /* APPLY_NODE */:
+        dependents = command[2];
         arg = [nNode(command[1]), str(command[2]) + " args"];
         break;
-      case 20 /* GET_MOD */:
+      case 21 /* GET_MOD */:
         arg = [str(command[1])];
+        dependents = 0;
         break;
-      case 19 /* APPLY_DOUBLE_NODE_STEREO */:
+      case 20 /* APPLY_DOUBLE_NODE_STEREO */:
+        dependents = command[2];
         arg = [nNode(command[1]), nNode(command[2]), str(command[1]) + " args"];
         break;
       default:
         command[0];
     }
-    outLines.push(`${opName} ${arg.join(", ")}`);
+    const deps = stack.splice(stack.length - dependents, dependents);
+    stack.push([`${opName} ${arg.join(", ")}`, ...deps]);
   }
-  return outLines.join("\n");
+  var out = "";
+  const recurse = /* @__PURE__ */ __name((a, depth) => {
+    for (var i = 1; i < a.length; i++) {
+      recurse(a[i], depth + 1);
+    }
+    out += "|  ".repeat(depth) + a[0] + "\n";
+  }, "recurse");
+  recurse(stack.pop(), 0);
+  return out;
 }
 __name(disassemble, "disassemble");
 
@@ -765,4 +799,4 @@ export {
   disassemble,
   initWorklet
 };
-//# sourceMappingURL=chunk-BVO774BH.js.map
+//# sourceMappingURL=chunk-ZCZN6RVT.js.map

@@ -446,6 +446,34 @@ describe("parse ternary operator", () => {
             }
         });
     });
+    test("nested ternary", async () => {
+        await expectParse("a?b?c:d:e", {
+            __class__: AST.Conditional,
+            cond: {
+                __class__: AST.Name,
+                name: "a",
+            },
+            caseTrue: {
+                __class__: AST.Conditional,
+                cond: {
+                    __class__: AST.Name,
+                    name: "b",
+                },
+                caseTrue: {
+                    __class__: AST.Name,
+                    name: "c",
+                },
+                caseFalse: {
+                    __class__: AST.Name,
+                    name: "d",
+                }
+            },
+            caseFalse: {
+                __class__: AST.Name,
+                name: "e",
+            }
+        });
+    });
     test("error when only half present", async () => {
         await expectParseError("a ? b", 'expected ":" after expression');
         await expectParseError("b : c", "named parameter not directly inside a callsite");

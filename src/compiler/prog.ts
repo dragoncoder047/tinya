@@ -22,6 +22,7 @@ export enum Opcode {
     GET_REGISTER,
     /** next is register no. */
     TAP_REGISTER,
+    SHIFT_REGISTER,
     CONDITIONAL_SELECT,
     /** doubles the sample into a [sample, sample] left right pair */
     STEREO_DOUBLE_WIDEN,

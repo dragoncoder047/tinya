@@ -50,12 +50,12 @@ export const OPERATORS: Record<string, Operator> = {
     // boolean OR / AND
     "||": op(5).code((a, b) => a || b),
     "&&": op(5).code((a, b) => a && b),
+    // bit shifting (before other bitwise to match C)
+    ">>": op(5.9).code((a, b) => a >> b),
+    "<<": op(5.9).code((a, b) => a << b),
     // bitwise OR / XOR
     "|": op(6).code((a, b) => a | b),
     "^": op(6).code((a, b) => a ^ b),
-    // bit shifting (slightly before other bitwise to match C)
-    ">>": op(5.9).code((a, b) => a >> b),
-    "<<": op(5.9).code((a, b) => a << b),
     // comparison
     "==": op(7).code((a, b) => a == b),
     ">=": op(7).code((a, b) => a >= b),
@@ -67,8 +67,8 @@ export const OPERATORS: Record<string, Operator> = {
     "|>": op(8),
     // conditional in 2 parts (treated as binary and postprocessed for simplicity)
     // colon is also used for keyword arguments
-    ":": op(9),
-    "?": op(10),
+    ":": op(9, INVALID, true),
+    "?": op(10, INVALID, true),
     // assignment operator (no overloads and handles specially, just here so it can be parsed in the right spot)
     "=": op(11),
     // mapping operator (for inside lists)

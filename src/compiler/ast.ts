@@ -123,6 +123,11 @@ export class LateBinding extends Name {
             throw new CompileError(`${this.name} was never assigned to in this scope`, this.loc);
         }
         compileNode(this.boundValue, state, refMap, ni);
+        const myRegname = "" + id(this.boundValue);
+        const last = state.p.at(-1)!;
+        if (!(last[0] === Opcode.GET_REGISTER && state.r[last[1] as number] === myRegname)) {
+            state.p.push([Opcode.SHIFT_REGISTER, allocRegister(myRegname, state)]);
+        }
     }
 }
 
@@ -473,7 +478,7 @@ export class Block extends Node {
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         for (var statement of this.body) {
-            statement.compile(state, refMap, ni);
+            compileNode(statement, state, refMap, ni);
             state.p.push([Opcode.DROP_TOP]);
         }
         // *Don't* drop the last value

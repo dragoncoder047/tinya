@@ -1,13 +1,13 @@
 import {
   nodes,
   passthroughFx
-} from "./chunk-BVO774BH.js";
+} from "./chunk-ZCZN6RVT.js";
 import {
   OPERATORS,
   __name,
   isArray,
   isNumber
-} from "./chunk-6OXE2FZD.js";
+} from "./chunk-7CNEPKY5.js";
 
 // src/runtime/automation.ts
 var AutomatedValue = class {
@@ -154,17 +154,22 @@ var Tone = class {
         case 15 /* TAP_REGISTER */:
           registers[code[1]] = peek();
           break;
-        case 16 /* CONDITIONAL_SELECT */:
+        case 16 /* SHIFT_REGISTER */:
+          a = registers[code[1]];
+          registers[code[1]] = pop();
+          push(a);
+          break;
+        case 17 /* CONDITIONAL_SELECT */:
           c = pop();
           b = pop();
           a = pop();
           push(c ? b : a);
           break;
-        case 17 /* STEREO_DOUBLE_WIDEN */:
+        case 18 /* STEREO_DOUBLE_WIDEN */:
           a = pop();
           push(stereo(a, a));
           break;
-        case 18 /* APPLY_NODE */:
+        case 19 /* APPLY_NODE */:
           a = code[1];
           i = args.length = code[2];
           while (i > 0) {
@@ -173,10 +178,10 @@ var Tone = class {
           }
           push(nodes2[a](this.dt, args));
           break;
-        case 20 /* GET_MOD */:
+        case 21 /* GET_MOD */:
           push(this.mods[code[1]]?.value ?? 0);
           break;
-        case 19 /* APPLY_DOUBLE_NODE_STEREO */:
+        case 20 /* APPLY_DOUBLE_NODE_STEREO */:
           a = code[1];
           b = code[2];
           i = args.length = argsL.length = argsR.length = c = code[3];

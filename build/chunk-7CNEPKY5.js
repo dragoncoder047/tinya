@@ -311,12 +311,12 @@ var OPERATORS = {
   // boolean OR / AND
   "||": op(5).code((a, b) => a || b),
   "&&": op(5).code((a, b) => a && b),
+  // bit shifting (before other bitwise to match C)
+  ">>": op(5.9).code((a, b) => a >> b),
+  "<<": op(5.9).code((a, b) => a << b),
   // bitwise OR / XOR
   "|": op(6).code((a, b) => a | b),
   "^": op(6).code((a, b) => a ^ b),
-  // bit shifting (slightly before other bitwise to match C)
-  ">>": op(5.9).code((a, b) => a >> b),
-  "<<": op(5.9).code((a, b) => a << b),
   // comparison
   "==": op(7).code((a, b) => a == b),
   ">=": op(7).code((a, b) => a >= b),
@@ -328,8 +328,8 @@ var OPERATORS = {
   "|>": op(8),
   // conditional in 2 parts (treated as binary and postprocessed for simplicity)
   // colon is also used for keyword arguments
-  ":": op(9),
-  "?": op(10),
+  ":": op(9, INVALID, true),
+  "?": op(10, INVALID, true),
   // assignment operator (no overloads and handles specially, just here so it can be parsed in the right spot)
   "=": op(11),
   // mapping operator (for inside lists)
@@ -378,11 +378,12 @@ var Opcode = /* @__PURE__ */ ((Opcode2) => {
   Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 13] = "DO_UNARY_OP_STEREO";
   Opcode2[Opcode2["GET_REGISTER"] = 14] = "GET_REGISTER";
   Opcode2[Opcode2["TAP_REGISTER"] = 15] = "TAP_REGISTER";
-  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 16] = "CONDITIONAL_SELECT";
-  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 17] = "STEREO_DOUBLE_WIDEN";
-  Opcode2[Opcode2["APPLY_NODE"] = 18] = "APPLY_NODE";
-  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 19] = "APPLY_DOUBLE_NODE_STEREO";
-  Opcode2[Opcode2["GET_MOD"] = 20] = "GET_MOD";
+  Opcode2[Opcode2["SHIFT_REGISTER"] = 16] = "SHIFT_REGISTER";
+  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 17] = "CONDITIONAL_SELECT";
+  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 18] = "STEREO_DOUBLE_WIDEN";
+  Opcode2[Opcode2["APPLY_NODE"] = 19] = "APPLY_NODE";
+  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 20] = "APPLY_DOUBLE_NODE_STEREO";
+  Opcode2[Opcode2["GET_MOD"] = 21] = "GET_MOD";
   return Opcode2;
 })(Opcode || {});
 function allocRegister(name, state) {
@@ -562,6 +563,11 @@ var LateBinding = class extends Name {
       throw new CompileError(`${this.name} was never assigned to in this scope`, this.loc);
     }
     compileNode(this.boundValue, state, refMap, ni);
+    const myRegname = "" + id(this.boundValue);
+    const last = state.p.at(-1);
+    if (!(last[0] === 14 /* GET_REGISTER */ && state.r[last[1]] === myRegname)) {
+      state.p.push([16 /* SHIFT_REGISTER */, allocRegister(myRegname, state)]);
+    }
   }
 };
 var Call = class _Call extends Node {
@@ -610,17 +616,17 @@ var Call = class _Call extends Node {
       argProgs.push([state.p, state.tosStereo ? 1 /* STEREO */ : 0 /* NORMAL_OR_MONO */]);
     }
     state.p = existingProg;
-    const callProg = [18 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
+    const callProg = [19 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
     state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
     if (nodeImpl[1].every((a) => a[2] !== 1 /* STEREO */) && argProgs.some((s) => s[1] === 1 /* STEREO */)) {
       for (i = 0; i < nodeImpl[1].length; i++) {
         const gottenArgType = argProgs[i][1];
         if (gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push([17 /* STEREO_DOUBLE_WIDEN */]);
+          argProgs[i][0].push([18 /* STEREO_DOUBLE_WIDEN */]);
         }
       }
       state.tosStereo = true;
-      callProg[0] = 19 /* APPLY_DOUBLE_NODE_STEREO */;
+      callProg[0] = 20 /* APPLY_DOUBLE_NODE_STEREO */;
       callProg.splice(2, 0, allocNode(this.name, state));
     } else {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -629,7 +635,7 @@ var Call = class _Call extends Node {
         if (neededArgType !== 1 /* STEREO */ && gottenArgType === 1 /* STEREO */) {
           throw new CompileError("cannot implicitly convert stereo output to mono", this.args[i].loc);
         } else if (neededArgType === 1 /* STEREO */ && gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push([17 /* STEREO_DOUBLE_WIDEN */]);
+          argProgs[i][0].push([18 /* STEREO_DOUBLE_WIDEN */]);
         }
       }
       state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
@@ -830,8 +836,8 @@ var BinaryOp = class _BinaryOp extends Node {
     compileNode(this.right, state, refMap, ni);
     const bStereo = state.tosStereo;
     if (state.tosStereo ||= aStereo) {
-      if (!aStereo) state.p.splice(aIndex, 0, [17 /* STEREO_DOUBLE_WIDEN */]);
-      if (!bStereo) state.p.push([17 /* STEREO_DOUBLE_WIDEN */]);
+      if (!aStereo) state.p.splice(aIndex, 0, [18 /* STEREO_DOUBLE_WIDEN */]);
+      if (!bStereo) state.p.push([18 /* STEREO_DOUBLE_WIDEN */]);
     }
     state.p.push([state.tosStereo ? 11 /* DO_BINARY_OP_STEREO */ : 10 /* DO_BINARY_OP */, this.op]);
   }
@@ -961,14 +967,14 @@ var Conditional = class _Conditional extends Node {
     compileNode(this.caseTrue, state, refMap, ni);
     const stereoT = state.tosStereo;
     if (state.tosStereo ||= stereoF) {
-      if (!stereoT) state.p.push([17 /* STEREO_DOUBLE_WIDEN */]);
-      if (!stereoF) state.p.splice(stereoI, 0, [17 /* STEREO_DOUBLE_WIDEN */]);
+      if (!stereoT) state.p.push([18 /* STEREO_DOUBLE_WIDEN */]);
+      if (!stereoF) state.p.splice(stereoI, 0, [18 /* STEREO_DOUBLE_WIDEN */]);
     }
     compileNode(this.cond, state, refMap, ni);
     if (state.tosStereo) {
       throw new CompileError("cannot use stereo output as condition", this.cond.loc);
     }
-    state.p.push([16 /* CONDITIONAL_SELECT */]);
+    state.p.push([17 /* CONDITIONAL_SELECT */]);
   }
 };
 var InterpolatedValue = class _InterpolatedValue extends NotCodeNode {
@@ -1039,7 +1045,7 @@ var Block = class _Block extends Node {
   }
   compile(state, refMap, ni) {
     for (var statement of this.body) {
-      statement.compile(state, refMap, ni);
+      compileNode(statement, state, refMap, ni);
       state.p.push([6 /* DROP_TOP */]);
     }
     state.p.pop();
@@ -1712,4 +1718,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-6OXE2FZD.js.map
+//# sourceMappingURL=chunk-7CNEPKY5.js.map
