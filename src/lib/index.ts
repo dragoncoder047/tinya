@@ -67,6 +67,3 @@ export async function newEnv() {
     await (lib as AST.Node).eval(env);
     return env;
 }
-export async function compileInstrument(source: string, filename: string) {
-
-}

@@ -1,6 +1,5 @@
 import {
   baseEnv,
-  compileInstrument,
   disassemble,
   initWorklet,
   newEnv,
@@ -8,7 +7,7 @@ import {
   nodeHelp,
   nodes,
   sources
-} from "./chunk-T3FNPAD2.js";
+} from "./chunk-SAXBY6KL.js";
 import {
   AnnotatedValue,
   Assignment,
@@ -43,9 +42,10 @@ import {
   ast_exports,
   compileNode,
   newCompileData,
+  optimizeProgram,
   parse,
   stackToNotes
-} from "./chunk-HDDICVZ4.js";
+} from "./chunk-Y5AIDCJX.js";
 export {
   ast_exports as AST,
   AnnotatedValue,
@@ -79,7 +79,6 @@ export {
   UnaryOp,
   Value,
   baseEnv,
-  compileInstrument,
   compileNode,
   disassemble,
   initWorklet,
@@ -89,6 +88,7 @@ export {
   newSynth,
   nodeHelp,
   nodes,
+  optimizeProgram,
   parse,
   stackToNotes
 };

@@ -1,8 +1,8 @@
-export { baseEnv, nodes, nodeHelp, libSrc, newEnv, compileInstrument } from "./lib";
+export { baseEnv, nodes, nodeHelp, libSrc, newEnv } from "./lib";
 export * from "./compiler/ast";
 export * as AST from "./compiler/ast";
 export { SydError, ErrorNote, LocationTrace, ParseError, CompileError, RuntimeError } from "./compiler/errors";
-export { parse } from "./compiler";
+export { parse, compileNode, newCompileData, optimizeProgram } from "./compiler";
 export { newSynth } from "./runtime/synthProxy";
 export { disassemble } from "./runtime/disassemble";
 

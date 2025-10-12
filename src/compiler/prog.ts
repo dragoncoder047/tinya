@@ -1,6 +1,7 @@
 import { AutomatedValueMethod } from "../runtime/automation";
 
 export enum Opcode {
+    NOOP,
     /** next is the constant */
     PUSH_CONSTANT,
     PUSH_INPUT_SAMPLES,

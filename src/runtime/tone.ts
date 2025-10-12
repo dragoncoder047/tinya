@@ -69,6 +69,8 @@ export class Tone {
             const code = prog[pc]!;
             const op = code[0];
             switch (op) {
+                case Opcode.NOOP:
+                    break;
                 case Opcode.PUSH_CONSTANT:
                     push(code[1]);
                     break;

@@ -70,6 +70,23 @@ var CompileError = class extends SydError {
   }
 };
 
+// src/utils.ts
+var typeOf = /* @__PURE__ */ __name((x) => typeof x, "typeOf");
+var is = /* @__PURE__ */ __name((t, func = typeOf) => (x) => func(x) === t, "is");
+var isNumber = is("number");
+var isArray = Array.isArray;
+var str = JSON.stringify;
+function isinstance(obj, cls) {
+  return obj instanceof cls;
+}
+__name(isinstance, "isinstance");
+var idMap = /* @__PURE__ */ new WeakMap();
+var idCounter = 0;
+var id = /* @__PURE__ */ __name((obj) => {
+  if (!idMap.has(obj)) idMap.set(obj, idCounter++);
+  return idMap.get(obj);
+}, "id");
+
 // src/compiler/ast.ts
 var ast_exports = {};
 __export(ast_exports, {
@@ -97,27 +114,8 @@ __export(ast_exports, {
   Template: () => Template,
   UnaryOp: () => UnaryOp,
   Value: () => Value,
-  compileNode: () => compileNode,
-  newCompileData: () => newCompileData,
   stackToNotes: () => stackToNotes
 });
-
-// src/utils.ts
-var typeOf = /* @__PURE__ */ __name((x) => typeof x, "typeOf");
-var is = /* @__PURE__ */ __name((t, func = typeOf) => (x) => func(x) === t, "is");
-var isNumber = is("number");
-var isArray = Array.isArray;
-var str = JSON.stringify;
-function isinstance(obj, cls) {
-  return obj instanceof cls;
-}
-__name(isinstance, "isinstance");
-var idMap = /* @__PURE__ */ new WeakMap();
-var idCounter = 0;
-var id = /* @__PURE__ */ __name((obj) => {
-  if (!idMap.has(obj)) idMap.set(obj, idCounter++);
-  return idMap.get(obj);
-}, "id");
 
 // src/compiler/call.ts
 async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
@@ -362,27 +360,28 @@ __name(isRightAssociative, "isRightAssociative");
 
 // src/compiler/prog.ts
 var Opcode = /* @__PURE__ */ ((Opcode2) => {
-  Opcode2[Opcode2["PUSH_CONSTANT"] = 0] = "PUSH_CONSTANT";
-  Opcode2[Opcode2["PUSH_INPUT_SAMPLES"] = 1] = "PUSH_INPUT_SAMPLES";
-  Opcode2[Opcode2["PUSH_PITCH"] = 2] = "PUSH_PITCH";
-  Opcode2[Opcode2["PUSH_EXPRESSION"] = 3] = "PUSH_EXPRESSION";
-  Opcode2[Opcode2["PUSH_GATE"] = 4] = "PUSH_GATE";
-  Opcode2[Opcode2["MARK_STILL_ALIVE"] = 5] = "MARK_STILL_ALIVE";
-  Opcode2[Opcode2["PUSH_FRESH_EMPTY_LIST"] = 6] = "PUSH_FRESH_EMPTY_LIST";
-  Opcode2[Opcode2["APPEND_TO_LIST"] = 7] = "APPEND_TO_LIST";
-  Opcode2[Opcode2["EXTEND_TO_LIST"] = 8] = "EXTEND_TO_LIST";
-  Opcode2[Opcode2["DO_BINARY_OP"] = 9] = "DO_BINARY_OP";
-  Opcode2[Opcode2["DO_BINARY_OP_STEREO"] = 10] = "DO_BINARY_OP_STEREO";
-  Opcode2[Opcode2["DO_UNARY_OP"] = 11] = "DO_UNARY_OP";
-  Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 12] = "DO_UNARY_OP_STEREO";
-  Opcode2[Opcode2["GET_REGISTER"] = 13] = "GET_REGISTER";
-  Opcode2[Opcode2["TAP_REGISTER"] = 14] = "TAP_REGISTER";
-  Opcode2[Opcode2["SHIFT_REGISTER"] = 15] = "SHIFT_REGISTER";
-  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 16] = "CONDITIONAL_SELECT";
-  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 17] = "STEREO_DOUBLE_WIDEN";
-  Opcode2[Opcode2["APPLY_NODE"] = 18] = "APPLY_NODE";
-  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 19] = "APPLY_DOUBLE_NODE_STEREO";
-  Opcode2[Opcode2["GET_MOD"] = 20] = "GET_MOD";
+  Opcode2[Opcode2["NOOP"] = 0] = "NOOP";
+  Opcode2[Opcode2["PUSH_CONSTANT"] = 1] = "PUSH_CONSTANT";
+  Opcode2[Opcode2["PUSH_INPUT_SAMPLES"] = 2] = "PUSH_INPUT_SAMPLES";
+  Opcode2[Opcode2["PUSH_PITCH"] = 3] = "PUSH_PITCH";
+  Opcode2[Opcode2["PUSH_EXPRESSION"] = 4] = "PUSH_EXPRESSION";
+  Opcode2[Opcode2["PUSH_GATE"] = 5] = "PUSH_GATE";
+  Opcode2[Opcode2["MARK_STILL_ALIVE"] = 6] = "MARK_STILL_ALIVE";
+  Opcode2[Opcode2["PUSH_FRESH_EMPTY_LIST"] = 7] = "PUSH_FRESH_EMPTY_LIST";
+  Opcode2[Opcode2["APPEND_TO_LIST"] = 8] = "APPEND_TO_LIST";
+  Opcode2[Opcode2["EXTEND_TO_LIST"] = 9] = "EXTEND_TO_LIST";
+  Opcode2[Opcode2["DO_BINARY_OP"] = 10] = "DO_BINARY_OP";
+  Opcode2[Opcode2["DO_BINARY_OP_STEREO"] = 11] = "DO_BINARY_OP_STEREO";
+  Opcode2[Opcode2["DO_UNARY_OP"] = 12] = "DO_UNARY_OP";
+  Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 13] = "DO_UNARY_OP_STEREO";
+  Opcode2[Opcode2["GET_REGISTER"] = 14] = "GET_REGISTER";
+  Opcode2[Opcode2["TAP_REGISTER"] = 15] = "TAP_REGISTER";
+  Opcode2[Opcode2["SHIFT_REGISTER"] = 16] = "SHIFT_REGISTER";
+  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 17] = "CONDITIONAL_SELECT";
+  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 18] = "STEREO_DOUBLE_WIDEN";
+  Opcode2[Opcode2["APPLY_NODE"] = 19] = "APPLY_NODE";
+  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 20] = "APPLY_DOUBLE_NODE_STEREO";
+  Opcode2[Opcode2["GET_MOD"] = 21] = "GET_MOD";
   return Opcode2;
 })(Opcode || {});
 function allocRegister(name, state) {
@@ -479,7 +478,7 @@ var Value = class extends Leaf {
     return this;
   }
   compile(state) {
-    state.p.push([0 /* PUSH_CONSTANT */, this.value]);
+    state.p.push([1 /* PUSH_CONSTANT */, this.value]);
     state.tosStereo = false;
   }
 };
@@ -529,7 +528,7 @@ var Assignment = class _Assignment extends Node {
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
-    state.p.push([14 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
+    state.p.push([15 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
   }
 };
 var Name = class extends Leaf {
@@ -548,7 +547,7 @@ var Name = class extends Leaf {
     return val;
   }
   compile(state, refMap, ni) {
-    state.p.push([13 /* GET_REGISTER */, allocRegister(this.name, state)]);
+    state.p.push([14 /* GET_REGISTER */, allocRegister(this.name, state)]);
   }
 };
 var LateBinding = class extends Name {
@@ -566,8 +565,8 @@ var LateBinding = class extends Name {
     compileNode(this.boundValue, state, refMap, ni);
     const myRegname = "" + id(this.boundValue);
     const last = state.p.at(-1);
-    if (!(last[0] === 13 /* GET_REGISTER */ && state.r[last[1]] === myRegname)) {
-      state.p.push([15 /* SHIFT_REGISTER */, allocRegister(myRegname, state)]);
+    if (!(last[0] === 14 /* GET_REGISTER */ && state.r[last[1]] === myRegname)) {
+      state.p.push([16 /* SHIFT_REGISTER */, allocRegister(myRegname, state)]);
     }
   }
 };
@@ -617,7 +616,7 @@ var Call = class _Call extends Node {
       argProgs.push([state.p, state.tosStereo ? 1 /* STEREO */ : 0 /* NORMAL_OR_MONO */]);
     }
     state.p = existingProg;
-    const callProg = [18 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
+    const callProg = [19 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
     state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
     if (nodeImpl[1].every((a) => a[2] !== 1 /* STEREO */) && argProgs.some((s) => s[1] === 1 /* STEREO */)) {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -627,7 +626,7 @@ var Call = class _Call extends Node {
         }
       }
       state.tosStereo = true;
-      callProg[0] = 19 /* APPLY_DOUBLE_NODE_STEREO */;
+      callProg[0] = 20 /* APPLY_DOUBLE_NODE_STEREO */;
       callProg.splice(2, 0, allocNode(this.name, state));
     } else {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -690,15 +689,15 @@ var List = class _List extends Node {
   compile(state, refMap, ni) {
     if (this.isImmediate()) {
       const imm = this.toImmediate();
-      state.p.push([0 /* PUSH_CONSTANT */, imm]);
+      state.p.push([1 /* PUSH_CONSTANT */, imm]);
     } else {
-      state.p.push([6 /* PUSH_FRESH_EMPTY_LIST */]);
+      state.p.push([7 /* PUSH_FRESH_EMPTY_LIST */]);
       for (var arg of this.values) {
         compileNode(arg, state, refMap, ni);
         if (isinstance(arg, SplatValue)) {
-          state.p.push([8 /* EXTEND_TO_LIST */]);
+          state.p.push([9 /* EXTEND_TO_LIST */]);
         } else {
-          state.p.push([7 /* APPEND_TO_LIST */]);
+          state.p.push([8 /* APPEND_TO_LIST */]);
         }
       }
     }
@@ -840,7 +839,7 @@ var BinaryOp = class _BinaryOp extends Node {
       if (!aStereo) makeStereoAtIndex(state.p, aIndex);
       if (!bStereo) makeStereoAtIndex(state.p);
     }
-    state.p.push([state.tosStereo ? 10 /* DO_BINARY_OP_STEREO */ : 9 /* DO_BINARY_OP */, this.op]);
+    state.p.push([state.tosStereo ? 11 /* DO_BINARY_OP_STEREO */ : 10 /* DO_BINARY_OP */, this.op]);
   }
 };
 var UnaryOp = class _UnaryOp extends Node {
@@ -878,7 +877,7 @@ var UnaryOp = class _UnaryOp extends Node {
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
-    state.p.push([state.tosStereo ? 12 /* DO_UNARY_OP_STEREO */ : 11 /* DO_UNARY_OP */, this.op]);
+    state.p.push([state.tosStereo ? 13 /* DO_UNARY_OP_STEREO */ : 12 /* DO_UNARY_OP */, this.op]);
   }
 };
 var DefaultPlaceholder = class extends Leaf {
@@ -975,7 +974,7 @@ var Conditional = class _Conditional extends Node {
     if (state.tosStereo) {
       throw new CompileError("cannot use stereo output as condition", this.cond.loc);
     }
-    state.p.push([16 /* CONDITIONAL_SELECT */]);
+    state.p.push([17 /* CONDITIONAL_SELECT */]);
   }
 };
 var InterpolatedValue = class _InterpolatedValue extends NotCodeNode {
@@ -1057,6 +1056,12 @@ function stackToNotes(stack) {
   return out.reverse();
 }
 __name(stackToNotes, "stackToNotes");
+function scopeForName(name, state) {
+  return Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
+}
+__name(scopeForName, "scopeForName");
+
+// src/compiler/compile.ts
 function newCompileData() {
   return {
     p: [],
@@ -1067,16 +1072,12 @@ function newCompileData() {
   };
 }
 __name(newCompileData, "newCompileData");
-function scopeForName(name, state) {
-  return Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
-}
-__name(scopeForName, "scopeForName");
 function makeStereoAtIndex(prog, index = prog.length) {
   const entryThere = prog[index - 1];
-  if (entryThere[0] === 0 /* PUSH_CONSTANT */ && !isArray(entryThere[1])) {
+  if (entryThere[0] === 1 /* PUSH_CONSTANT */ && !isArray(entryThere[1])) {
     entryThere[1] = [entryThere[1], entryThere[1]];
   } else {
-    prog.splice(index, 0, [17 /* STEREO_DOUBLE_WIDEN */]);
+    prog.splice(index, 0, [18 /* STEREO_DOUBLE_WIDEN */]);
   }
 }
 __name(makeStereoAtIndex, "makeStereoAtIndex");
@@ -1088,32 +1089,25 @@ function compileNode(node, state, cache, ni) {
   const entry = cache.get(node);
   const regname = "" + id(node);
   if (entry) {
-    if (!entry[0]) {
-      entry[0] = true;
-      if (entry[1] !== null) {
-        state.p.splice(entry[1], 0, [14 /* TAP_REGISTER */, allocRegister(regname, state)]);
-        for (var e of cache.values()) {
-          if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
-        }
-      } else {
-      }
-    } else {
-    }
-    state.p.push([13 /* GET_REGISTER */, allocRegister(regname, state)]);
-    state.tosStereo = entry[2];
+    entry.t[0] = 15 /* TAP_REGISTER */;
+    entry.t[1] = allocRegister(regname, state);
+    state.p.push([14 /* GET_REGISTER */, allocRegister(regname, state)]);
+    state.tosStereo = entry.s;
   } else {
-    const myEntry = [false, null, false];
+    const myEntry = { s: false, t: [0 /* NOOP */] };
     cache.set(node, myEntry);
     node.compile(state, cache, ni);
-    myEntry[1] = state.p.length;
-    myEntry[2] = state.tosStereo;
-    if (myEntry[0]) {
-      state.p.push([14 /* TAP_REGISTER */, allocRegister(regname, state)]);
-    }
+    myEntry.s = state.tosStereo;
+    state.p.push(myEntry.t);
   }
   return state;
 }
 __name(compileNode, "compileNode");
+function optimizeProgram(state) {
+  state.p = state.p.filter((i) => i[0] !== 0 /* NOOP */);
+  return state;
+}
+__name(optimizeProgram, "optimizeProgram");
 
 // src/compiler/tokenizer.ts
 var Token = class {
@@ -1691,6 +1685,9 @@ export {
   ParseError,
   RuntimeError,
   CompileError,
+  newCompileData,
+  compileNode,
+  optimizeProgram,
   OPERATORS,
   Node,
   NotCodeNode,
@@ -1717,9 +1714,7 @@ export {
   PipePlaceholder,
   Block,
   stackToNotes,
-  newCompileData,
-  compileNode,
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-HDDICVZ4.js.map
+//# sourceMappingURL=chunk-Y5AIDCJX.js.map

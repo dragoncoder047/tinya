@@ -1,6 +1,7 @@
-import { id, isArray, isinstance, str } from "../utils";
+import { id, isinstance, str } from "../utils";
 import { processArgsInCall } from "./call";
 import { makeCodeMacroExpander } from "./codemacro";
+import { ResultCacheEntry, compileNode, makeStereoAtIndex } from "./compile";
 import { CompileError, ErrorNote, LocationTrace, RuntimeError } from "./errors";
 import { EvalState, NodeDef, NodeValueType, pushNamed } from "./evalState";
 import { OPERATORS } from "./operator";
@@ -491,77 +492,8 @@ export function stackToNotes(stack: Call[]): ErrorNote[] {
     return out.reverse();
 }
 
-export function newCompileData(): CompiledVoiceData {
-    return {
-        p: [],
-        r: [],
-        nn: [],
-        tosStereo: false,
-        mods: [],
-    }
-}
-
 function scopeForName(name: string, state: EvalState) {
     return Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
 }
 
-function makeStereoAtIndex(prog: Program, index: number = prog.length) {
-    const entryThere = prog[index - 1]!;
-    if (entryThere[0] === Opcode.PUSH_CONSTANT && !isArray(entryThere[1])) {
-        entryThere[1] = [entryThere[1] as number, entryThere[1] as number];
-    } else {
-        prog.splice(index, 0, [Opcode.STEREO_DOUBLE_WIDEN]);
-    }
-}
 
-type ResultCacheEntry = [
-    needsTapInserted: boolean, // whether this node is reffed multiple times
-    indexToInsertTap: number | null, // index into prog to insert tap - defined if node is completed and tap must be spliced in
-    stereo: boolean, // whether node said top of stack was stereo
-];
-
-export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Node, ResultCacheEntry>, ni: NodeDef[]): CompiledVoiceData {
-    if (isinstance(node, Value)) {
-        node.compile(state);
-        return state;
-    }
-    const entry = cache.get(node);
-    const regname = "" + id(node);
-    if (entry) {
-        // we have seen this node before
-        if (!entry[0]) {
-            // we have seen this node the 2nd time
-            entry[0] = true;
-            // haven't assigned a tap yet
-            if (entry[1] !== null) {
-                // ... but we're not in this node's definition, so the tap point has already been passed
-                state.p.splice(entry[1], 0, [Opcode.TAP_REGISTER, allocRegister(regname, state)]);
-                // update nodes further down the line after this in the program that haven't had the tap inserted yet
-                for (var e of cache.values()) {
-                    if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
-                }
-            } else {
-                // node has NOT been compiled in fully so tap point doesn't exist yet - this is a use-before-definition!
-                // we don't need to adjust any indices
-            }
-        } else {
-            // node's tap has been handled already or will be handled
-        }
-        state.p.push([Opcode.GET_REGISTER, allocRegister(regname, state)]);
-        state.tosStereo = entry[2];
-    }
-    else {
-        // New node
-        const myEntry: ResultCacheEntry = [false, null, false];
-        cache.set(node, myEntry);
-        // Do the thing
-        node.compile(state, cache, ni);
-        myEntry[1] = state.p.length;
-        myEntry[2] = state.tosStereo;
-        // Tap out if requested previously
-        if (myEntry[0]) {
-            state.p.push([Opcode.TAP_REGISTER, allocRegister(regname, state)]);
-        }
-    }
-    return state;
-}

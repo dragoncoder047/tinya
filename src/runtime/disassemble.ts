@@ -7,11 +7,16 @@ export function disassemble(data: CompiledVoiceData): string {
         return `${number} (${data.nn[number]})`;
     }
     const stack: [string, ...any][] = [];
-    for (var command of prog) {
+    var noopCount = 0;
+    mainloop: for (var command of prog) {
         const opName = Opcode[command[0]];
         var arg: string[] = [];
         var dependents: number = 0;
         switch (command[0]) {
+            case Opcode.NOOP:
+                noopCount++;
+                stack.push([opName]);
+                continue mainloop;
             // @ts-ignore
             case Opcode.PUSH_CONSTANT:
                 arg = [str(command[1])];
@@ -20,8 +25,6 @@ export function disassemble(data: CompiledVoiceData): string {
             case Opcode.PUSH_EXPRESSION:
             case Opcode.PUSH_GATE:
             case Opcode.MARK_STILL_ALIVE:
-                dependents = 0;
-                break;
             case Opcode.PUSH_FRESH_EMPTY_LIST:
                 dependents = 0;
                 break;
@@ -69,8 +72,9 @@ export function disassemble(data: CompiledVoiceData): string {
             default:
                 command[0] satisfies never;
         }
-        const deps = stack.splice(stack.length - dependents, dependents);
+        const deps = stack.splice(stack.length - dependents - noopCount, dependents + noopCount);
         stack.push([`${opName} ${arg.join(", ")}`, ...deps]);
+        noopCount = 0;
     }
     var out = "";
     const recurse = (a: any[], depth: number) => {
@@ -79,6 +83,6 @@ export function disassemble(data: CompiledVoiceData): string {
         }
         out += "|  ".repeat(depth) + a[0] + "\n";
     }
-    recurse(stack.pop()!, 0);
+    while (stack.length > 0) recurse(stack.shift()!, 0);
     return out;
 }

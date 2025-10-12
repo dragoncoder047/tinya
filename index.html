@@ -79,7 +79,7 @@ t * (42 & t>>10)
                     const ast = await syd.parse(src, dummyName);
                     const evaled = await ast.eval(env);
                     console.log("Evaled", evaled);
-                    const compiled = syd.compileNode(evaled, syd.newCompileData(), new Map, syd.nodes());
+                    const compiled = syd.optimizeProgram(syd.compileNode(evaled, syd.newCompileData(), new Map, syd.nodes()));
                     console.log("Final program", compiled);
                     showLog(syd.disassemble(compiled));
                     await synth.setPostFX(compiled);
