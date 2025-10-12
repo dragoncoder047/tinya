@@ -178,6 +178,20 @@ describe("parse expressions", () => {
             }
         });
     });
+    test("subtraction sign in mooshed expression is not confused for a negative number", async () => {
+        expectParse("a-1", {
+            __class__: AST.BinaryOp,
+            op: "-",
+            left: {
+                __class__: AST.Name,
+                name: "a",
+            },
+            right: {
+                __class__: AST.Value,
+                value: 1
+            }
+        });
+    });
     test("parses splat form", async () => {
         await expectParse("foo(*bar())", {
             __class__: AST.Call,
@@ -471,6 +485,34 @@ describe("parse ternary operator", () => {
             caseFalse: {
                 __class__: AST.Name,
                 name: "e",
+            }
+        });
+    });
+    test("chained ternary", async () => {
+        await expectParse("a?b:c?d:e", {
+            __class__: AST.Conditional,
+            cond: {
+                __class__: AST.Name,
+                name: "a",
+            },
+            caseTrue: {
+                __class__: AST.Name,
+                name: "b",
+            },
+            caseFalse: {
+                __class__: AST.Conditional,
+                cond: {
+                    __class__: AST.Name,
+                    name: "c",
+                },
+                caseTrue: {
+                    __class__: AST.Name,
+                    name: "d",
+                },
+                caseFalse: {
+                    __class__: AST.Name,
+                    name: "e",
+                }
             }
         });
     });
