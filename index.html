@@ -26,15 +26,19 @@
         <h1>Syd test</h1>
         <p><a href="https://github.com/dragoncoder047/syd?tab=readme-ov-file">(What is this?)</a></p>
         <p><button id="play">Play</button></p>
-        <p>Instrument: <textarea id="instrument" rows="10" cols="80">// In lieu of a sequencer...
-s = (s+1) % 6; t += (s == 0);
-// the "42" melody
-t * (42 & t>>10)
-|> (# & 255) / 1024
-|> zzfxFilter(#, 1, 1)
-|> zzfxFilter(#, -450, 10)
-|> bitcrusher(#)
-|> (prev = # + 0.5 * delay(prev, 1 + zzfxOscillator(1)))</textarea></p>
+        <p>Instrument: <textarea id="instrument" rows="10" cols="80">// thanks LeoV!!
+t = t + (1 / 48000); tm = 5;
+nC = 5; nT = (t * tm) % nC;
+env = 1 - t * tm % 1; env2 = 1 - (t * tm * 0.5) % 1; env3 = 1 - (t * tm * 0.5 + 0.5) % 1; env4 = 1 - (t * tm * 0.25 + 0.5) % 1;
+f1 = nT > 3 ? 525 : (nT > 2 ? 660 : (nT > 1 ? 700 : 440));
+o1 = zzfxOscillator(f1, 2) / 8 * env ** 2 |> (fb = delay(# + fb * 0.6, 0.3));
+o2 = zzfxOscillator(f1 * (3/2) ** 1 * 0.5, 2) / 8 * env ** 2 |> (fb2 = delay(# + fb2 * 0.6, 0.4));
+o3 = zzfxOscillator(f1 * (3/2) ** 1 * 0.45, 2) / 8 * env ** 5 |> (fb3 = delay(# + fb3 * 0.6, 0.3));
+o4 = zzfxOscillator(f1 * (3/2) ** 0.0125 * 2, 2) / 8 * env ** 2 |> (fb4 = delay(# + fb4 * 0.7, 0.002)) |> (fb5 = delay(# + fb5 * 0.6, 0.3));
+o5 = zzfxOscillator(440 * 0.125 + env2 ** 30 * 1000, 1) / 2 * env2;
+o6 = zzfxOscillator(2000, 5, 1) / 5 * env3 ** 5;
+o7 = zzfxOscillator(290) / 1 * env4 ** 40 + zzfxOscillator(1000, 1, 1, 40) / 2 * env4 ** 9;
+o1 + ([-1, 1] * o2) + ([1, -1] * o3) + ([-1, 1] * o4) + o5 + o6 + o7</textarea></p>
         <canvas id="oscilloscope" width="800" height="200"></canvas>
         <div id="log"></div>
         <script type="module">
