@@ -7,7 +7,8 @@ import { OPERATORS } from "./operator";
 import { allocNode, allocRegister, CompiledVoiceData, Opcode, Program } from "./prog";
 
 export abstract class Node {
-    constructor(public loc: LocationTrace) { }
+    id: number;
+    constructor(public loc: LocationTrace) { this.id = id(this); }
     abstract edgemost(left: boolean): Node;
     abstract pipe(fn: (node: Node) => Promise<Node>): Promise<Node>;
     abstract eval(state: EvalState): Promise<Node>;
@@ -514,8 +515,8 @@ function makeStereoAtIndex(prog: Program, index: number = prog.length) {
 }
 
 type ResultCacheEntry = [
-    used: boolean, // whether this node is reffed multiple times
-    index: number | null, // index into prog to insert tap - defined if node is completed and tap must be spliced in
+    needsTapInserted: boolean, // whether this node is reffed multiple times
+    indexToInsertTap: number | null, // index into prog to insert tap - defined if node is completed and tap must be spliced in
     stereo: boolean, // whether node said top of stack was stereo
 ];
 
@@ -535,7 +536,7 @@ export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Nod
             if (entry[1] !== null) {
                 // ... but we're not in this node's definition, so the tap point has already been passed
                 state.p.splice(entry[1], 0, [Opcode.TAP_REGISTER, allocRegister(regname, state)]);
-                // update nodes further down the line after this in the program
+                // update nodes further down the line after this in the program that haven't had the tap inserted yet
                 for (var e of cache.values()) {
                     if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
                 }

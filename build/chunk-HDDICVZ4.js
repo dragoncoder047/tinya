@@ -400,10 +400,12 @@ __name(allocNode, "allocNode");
 var Node = class {
   constructor(loc) {
     this.loc = loc;
+    this.id = id(this);
   }
   static {
     __name(this, "Node");
   }
+  id;
 };
 var NotCodeNode = class extends Node {
   static {
@@ -1720,4 +1722,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-2YFXNSFU.js.map
+//# sourceMappingURL=chunk-HDDICVZ4.js.map
