@@ -22,9 +22,6 @@ export function disassemble(data: CompiledVoiceData): string {
             case Opcode.MARK_STILL_ALIVE:
                 dependents = 0;
                 break;
-            case Opcode.DROP_TOP:
-                dependents = 1;
-                break;
             case Opcode.PUSH_FRESH_EMPTY_LIST:
                 dependents = 0;
                 break;

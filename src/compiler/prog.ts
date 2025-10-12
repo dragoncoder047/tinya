@@ -8,7 +8,6 @@ export enum Opcode {
     PUSH_EXPRESSION,
     PUSH_GATE,
     MARK_STILL_ALIVE,
-    DROP_TOP,
     PUSH_FRESH_EMPTY_LIST,
     APPEND_TO_LIST,
     EXTEND_TO_LIST,

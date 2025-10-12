@@ -26,7 +26,7 @@ import {
   str,
   tan,
   tri
-} from "./chunk-7CNEPKY5.js";
+} from "./chunk-2YFXNSFU.js";
 
 // src/lib/index.syd
 var sources = {
@@ -425,7 +425,7 @@ var delay = [
       const delaySamples = delayTime / dt;
       if (delaySamples > len) {
         var newLen = len << 1;
-        const newBuffer = new Float32Array(len);
+        const newBuffer = new Float32Array(newLen);
         for (var i = 0; i < len; i++) newBuffer[i] = buffer[pos + i & len - 1];
         buffer = newBuffer;
         pos = len;
@@ -713,50 +713,47 @@ function disassemble(data) {
       case 5 /* MARK_STILL_ALIVE */:
         dependents = 0;
         break;
-      case 6 /* DROP_TOP */:
-        dependents = 1;
-        break;
-      case 7 /* PUSH_FRESH_EMPTY_LIST */:
+      case 6 /* PUSH_FRESH_EMPTY_LIST */:
         dependents = 0;
         break;
-      case 8 /* APPEND_TO_LIST */:
-      case 9 /* EXTEND_TO_LIST */:
+      case 7 /* APPEND_TO_LIST */:
+      case 8 /* EXTEND_TO_LIST */:
         dependents = 2;
         break;
-      case 10 /* DO_BINARY_OP */:
-      case 11 /* DO_BINARY_OP_STEREO */:
+      case 9 /* DO_BINARY_OP */:
+      case 10 /* DO_BINARY_OP_STEREO */:
         arg = [str(command[1])];
         dependents = 2;
         break;
-      case 12 /* DO_UNARY_OP */:
-      case 13 /* DO_UNARY_OP_STEREO */:
+      case 11 /* DO_UNARY_OP */:
+      case 12 /* DO_UNARY_OP_STEREO */:
         arg = [str(command[1])];
         dependents = 1;
         break;
-      case 14 /* GET_REGISTER */:
+      case 13 /* GET_REGISTER */:
         arg = [str(command[1])];
         dependents = 0;
         break;
-      case 15 /* TAP_REGISTER */:
-      case 16 /* SHIFT_REGISTER */:
+      case 14 /* TAP_REGISTER */:
+      case 15 /* SHIFT_REGISTER */:
         arg = [str(command[1])];
         dependents = 1;
         break;
-      case 17 /* CONDITIONAL_SELECT */:
+      case 16 /* CONDITIONAL_SELECT */:
         dependents = 3;
         break;
-      case 18 /* STEREO_DOUBLE_WIDEN */:
+      case 17 /* STEREO_DOUBLE_WIDEN */:
         dependents = 1;
         break;
-      case 19 /* APPLY_NODE */:
+      case 18 /* APPLY_NODE */:
         dependents = command[2];
         arg = [nNode(command[1]), str(command[2]) + " args"];
         break;
-      case 21 /* GET_MOD */:
+      case 20 /* GET_MOD */:
         arg = [str(command[1])];
         dependents = 0;
         break;
-      case 20 /* APPLY_DOUBLE_NODE_STEREO */:
+      case 19 /* APPLY_DOUBLE_NODE_STEREO */:
         dependents = command[2];
         arg = [nNode(command[1]), nNode(command[2]), str(command[1]) + " args"];
         break;
@@ -799,4 +796,4 @@ export {
   disassemble,
   initWorklet
 };
-//# sourceMappingURL=chunk-ZCZN6RVT.js.map
+//# sourceMappingURL=chunk-UR3VBZTS.js.map

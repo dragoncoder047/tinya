@@ -368,22 +368,21 @@ var Opcode = /* @__PURE__ */ ((Opcode2) => {
   Opcode2[Opcode2["PUSH_EXPRESSION"] = 3] = "PUSH_EXPRESSION";
   Opcode2[Opcode2["PUSH_GATE"] = 4] = "PUSH_GATE";
   Opcode2[Opcode2["MARK_STILL_ALIVE"] = 5] = "MARK_STILL_ALIVE";
-  Opcode2[Opcode2["DROP_TOP"] = 6] = "DROP_TOP";
-  Opcode2[Opcode2["PUSH_FRESH_EMPTY_LIST"] = 7] = "PUSH_FRESH_EMPTY_LIST";
-  Opcode2[Opcode2["APPEND_TO_LIST"] = 8] = "APPEND_TO_LIST";
-  Opcode2[Opcode2["EXTEND_TO_LIST"] = 9] = "EXTEND_TO_LIST";
-  Opcode2[Opcode2["DO_BINARY_OP"] = 10] = "DO_BINARY_OP";
-  Opcode2[Opcode2["DO_BINARY_OP_STEREO"] = 11] = "DO_BINARY_OP_STEREO";
-  Opcode2[Opcode2["DO_UNARY_OP"] = 12] = "DO_UNARY_OP";
-  Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 13] = "DO_UNARY_OP_STEREO";
-  Opcode2[Opcode2["GET_REGISTER"] = 14] = "GET_REGISTER";
-  Opcode2[Opcode2["TAP_REGISTER"] = 15] = "TAP_REGISTER";
-  Opcode2[Opcode2["SHIFT_REGISTER"] = 16] = "SHIFT_REGISTER";
-  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 17] = "CONDITIONAL_SELECT";
-  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 18] = "STEREO_DOUBLE_WIDEN";
-  Opcode2[Opcode2["APPLY_NODE"] = 19] = "APPLY_NODE";
-  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 20] = "APPLY_DOUBLE_NODE_STEREO";
-  Opcode2[Opcode2["GET_MOD"] = 21] = "GET_MOD";
+  Opcode2[Opcode2["PUSH_FRESH_EMPTY_LIST"] = 6] = "PUSH_FRESH_EMPTY_LIST";
+  Opcode2[Opcode2["APPEND_TO_LIST"] = 7] = "APPEND_TO_LIST";
+  Opcode2[Opcode2["EXTEND_TO_LIST"] = 8] = "EXTEND_TO_LIST";
+  Opcode2[Opcode2["DO_BINARY_OP"] = 9] = "DO_BINARY_OP";
+  Opcode2[Opcode2["DO_BINARY_OP_STEREO"] = 10] = "DO_BINARY_OP_STEREO";
+  Opcode2[Opcode2["DO_UNARY_OP"] = 11] = "DO_UNARY_OP";
+  Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 12] = "DO_UNARY_OP_STEREO";
+  Opcode2[Opcode2["GET_REGISTER"] = 13] = "GET_REGISTER";
+  Opcode2[Opcode2["TAP_REGISTER"] = 14] = "TAP_REGISTER";
+  Opcode2[Opcode2["SHIFT_REGISTER"] = 15] = "SHIFT_REGISTER";
+  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 16] = "CONDITIONAL_SELECT";
+  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 17] = "STEREO_DOUBLE_WIDEN";
+  Opcode2[Opcode2["APPLY_NODE"] = 18] = "APPLY_NODE";
+  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 19] = "APPLY_DOUBLE_NODE_STEREO";
+  Opcode2[Opcode2["GET_MOD"] = 20] = "GET_MOD";
   return Opcode2;
 })(Opcode || {});
 function allocRegister(name, state) {
@@ -528,7 +527,7 @@ var Assignment = class _Assignment extends Node {
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
-    state.p.push([15 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
+    state.p.push([14 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
   }
 };
 var Name = class extends Leaf {
@@ -547,7 +546,7 @@ var Name = class extends Leaf {
     return val;
   }
   compile(state, refMap, ni) {
-    state.p.push([14 /* GET_REGISTER */, allocRegister(this.name, state)]);
+    state.p.push([13 /* GET_REGISTER */, allocRegister(this.name, state)]);
   }
 };
 var LateBinding = class extends Name {
@@ -565,8 +564,8 @@ var LateBinding = class extends Name {
     compileNode(this.boundValue, state, refMap, ni);
     const myRegname = "" + id(this.boundValue);
     const last = state.p.at(-1);
-    if (!(last[0] === 14 /* GET_REGISTER */ && state.r[last[1]] === myRegname)) {
-      state.p.push([16 /* SHIFT_REGISTER */, allocRegister(myRegname, state)]);
+    if (!(last[0] === 13 /* GET_REGISTER */ && state.r[last[1]] === myRegname)) {
+      state.p.push([15 /* SHIFT_REGISTER */, allocRegister(myRegname, state)]);
     }
   }
 };
@@ -616,17 +615,17 @@ var Call = class _Call extends Node {
       argProgs.push([state.p, state.tosStereo ? 1 /* STEREO */ : 0 /* NORMAL_OR_MONO */]);
     }
     state.p = existingProg;
-    const callProg = [19 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
+    const callProg = [18 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
     state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
     if (nodeImpl[1].every((a) => a[2] !== 1 /* STEREO */) && argProgs.some((s) => s[1] === 1 /* STEREO */)) {
       for (i = 0; i < nodeImpl[1].length; i++) {
         const gottenArgType = argProgs[i][1];
         if (gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push([18 /* STEREO_DOUBLE_WIDEN */]);
+          makeStereoAtIndex(argProgs[i][0]);
         }
       }
       state.tosStereo = true;
-      callProg[0] = 20 /* APPLY_DOUBLE_NODE_STEREO */;
+      callProg[0] = 19 /* APPLY_DOUBLE_NODE_STEREO */;
       callProg.splice(2, 0, allocNode(this.name, state));
     } else {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -635,7 +634,7 @@ var Call = class _Call extends Node {
         if (neededArgType !== 1 /* STEREO */ && gottenArgType === 1 /* STEREO */) {
           throw new CompileError("cannot implicitly convert stereo output to mono", this.args[i].loc);
         } else if (neededArgType === 1 /* STEREO */ && gottenArgType !== 1 /* STEREO */) {
-          argProgs[i][0].push([18 /* STEREO_DOUBLE_WIDEN */]);
+          makeStereoAtIndex(argProgs[i][0]);
         }
       }
       state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
@@ -691,13 +690,13 @@ var List = class _List extends Node {
       const imm = this.toImmediate();
       state.p.push([0 /* PUSH_CONSTANT */, imm]);
     } else {
-      state.p.push([7 /* PUSH_FRESH_EMPTY_LIST */]);
+      state.p.push([6 /* PUSH_FRESH_EMPTY_LIST */]);
       for (var arg of this.values) {
         compileNode(arg, state, refMap, ni);
         if (isinstance(arg, SplatValue)) {
-          state.p.push([9 /* EXTEND_TO_LIST */]);
+          state.p.push([8 /* EXTEND_TO_LIST */]);
         } else {
-          state.p.push([8 /* APPEND_TO_LIST */]);
+          state.p.push([7 /* APPEND_TO_LIST */]);
         }
       }
     }
@@ -836,10 +835,10 @@ var BinaryOp = class _BinaryOp extends Node {
     compileNode(this.right, state, refMap, ni);
     const bStereo = state.tosStereo;
     if (state.tosStereo ||= aStereo) {
-      if (!aStereo) state.p.splice(aIndex, 0, [18 /* STEREO_DOUBLE_WIDEN */]);
-      if (!bStereo) state.p.push([18 /* STEREO_DOUBLE_WIDEN */]);
+      if (!aStereo) makeStereoAtIndex(state.p, aIndex);
+      if (!bStereo) makeStereoAtIndex(state.p);
     }
-    state.p.push([state.tosStereo ? 11 /* DO_BINARY_OP_STEREO */ : 10 /* DO_BINARY_OP */, this.op]);
+    state.p.push([state.tosStereo ? 10 /* DO_BINARY_OP_STEREO */ : 9 /* DO_BINARY_OP */, this.op]);
   }
 };
 var UnaryOp = class _UnaryOp extends Node {
@@ -877,7 +876,7 @@ var UnaryOp = class _UnaryOp extends Node {
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
-    state.p.push([state.tosStereo ? 13 /* DO_UNARY_OP_STEREO */ : 12 /* DO_UNARY_OP */, this.op]);
+    state.p.push([state.tosStereo ? 12 /* DO_UNARY_OP_STEREO */ : 11 /* DO_UNARY_OP */, this.op]);
   }
 };
 var DefaultPlaceholder = class extends Leaf {
@@ -967,14 +966,14 @@ var Conditional = class _Conditional extends Node {
     compileNode(this.caseTrue, state, refMap, ni);
     const stereoT = state.tosStereo;
     if (state.tosStereo ||= stereoF) {
-      if (!stereoT) state.p.push([18 /* STEREO_DOUBLE_WIDEN */]);
-      if (!stereoF) state.p.splice(stereoI, 0, [18 /* STEREO_DOUBLE_WIDEN */]);
+      if (!stereoT) makeStereoAtIndex(state.p, stereoI);
+      if (!stereoF) makeStereoAtIndex(state.p);
     }
     compileNode(this.cond, state, refMap, ni);
     if (state.tosStereo) {
       throw new CompileError("cannot use stereo output as condition", this.cond.loc);
     }
-    state.p.push([17 /* CONDITIONAL_SELECT */]);
+    state.p.push([16 /* CONDITIONAL_SELECT */]);
   }
 };
 var InterpolatedValue = class _InterpolatedValue extends NotCodeNode {
@@ -1021,7 +1020,7 @@ var PipePlaceholder = class extends Leaf {
     throw new RuntimeError("not valid outside of a pipe expression", this.loc, stackToNotes(state.callstack));
   }
 };
-var Block = class _Block extends Node {
+var Block = class _Block extends NotCodeNode {
   constructor(trace, body) {
     super(trace);
     this.body = body;
@@ -1042,13 +1041,6 @@ var Block = class _Block extends Node {
       else last = await v.eval(state);
     }
     return last;
-  }
-  compile(state, refMap, ni) {
-    for (var statement of this.body) {
-      compileNode(statement, state, refMap, ni);
-      state.p.push([6 /* DROP_TOP */]);
-    }
-    state.p.pop();
   }
 };
 async function asyncNodePipe(nodes, fn) {
@@ -1077,6 +1069,15 @@ function scopeForName(name, state) {
   return Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
 }
 __name(scopeForName, "scopeForName");
+function makeStereoAtIndex(prog, index = prog.length) {
+  const entryThere = prog[index - 1];
+  if (entryThere[0] === 0 /* PUSH_CONSTANT */ && !isArray(entryThere[1])) {
+    entryThere[1] = [entryThere[1], entryThere[1]];
+  } else {
+    prog.splice(index, 0, [17 /* STEREO_DOUBLE_WIDEN */]);
+  }
+}
+__name(makeStereoAtIndex, "makeStereoAtIndex");
 function compileNode(node, state, cache, ni) {
   if (isinstance(node, Value)) {
     node.compile(state);
@@ -1088,7 +1089,7 @@ function compileNode(node, state, cache, ni) {
     if (!entry[0]) {
       entry[0] = true;
       if (entry[1] !== null) {
-        state.p.splice(entry[1], 0, [15 /* TAP_REGISTER */, allocRegister(regname, state)]);
+        state.p.splice(entry[1], 0, [14 /* TAP_REGISTER */, allocRegister(regname, state)]);
         for (var e of cache.values()) {
           if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
         }
@@ -1096,16 +1097,17 @@ function compileNode(node, state, cache, ni) {
       }
     } else {
     }
-    state.p.push([14 /* GET_REGISTER */, allocRegister(regname, state)]);
+    state.p.push([13 /* GET_REGISTER */, allocRegister(regname, state)]);
     state.tosStereo = entry[2];
   } else {
     const myEntry = [false, null, false];
     cache.set(node, myEntry);
     node.compile(state, cache, ni);
-    if (myEntry[0]) {
-      state.p.push([15 /* TAP_REGISTER */, allocRegister(regname, state)]);
-    }
     myEntry[1] = state.p.length;
+    myEntry[2] = state.tosStereo;
+    if (myEntry[0]) {
+      state.p.push([14 /* TAP_REGISTER */, allocRegister(regname, state)]);
+    }
   }
   return state;
 }
@@ -1718,4 +1720,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-7CNEPKY5.js.map
+//# sourceMappingURL=chunk-2YFXNSFU.js.map

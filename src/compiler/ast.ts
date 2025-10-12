@@ -1,4 +1,4 @@
-import { id, isinstance, str } from "../utils";
+import { id, isArray, isinstance, str } from "../utils";
 import { processArgsInCall } from "./call";
 import { makeCodeMacroExpander } from "./codemacro";
 import { CompileError, ErrorNote, LocationTrace, RuntimeError } from "./errors";
@@ -179,7 +179,7 @@ export class Call extends Node {
             for (i = 0; i < nodeImpl[1].length; i++) {
                 const gottenArgType = argProgs[i]![1];
                 if (gottenArgType !== NodeValueType.STEREO) {
-                    argProgs[i]![0].push([Opcode.STEREO_DOUBLE_WIDEN]);
+                    makeStereoAtIndex(argProgs[i]![0]);
                 }
             }
             state.tosStereo = true;
@@ -193,7 +193,7 @@ export class Call extends Node {
                 if (neededArgType !== NodeValueType.STEREO && gottenArgType === NodeValueType.STEREO) {
                     throw new CompileError("cannot implicitly convert stereo output to mono", this.args[i]!.loc);
                 } else if (neededArgType === NodeValueType.STEREO && gottenArgType !== NodeValueType.STEREO) {
-                    argProgs[i]![0].push([Opcode.STEREO_DOUBLE_WIDEN]);
+                    makeStereoAtIndex(argProgs[i]![0]);
                 }
             }
             state.tosStereo = nodeImpl[2] === NodeValueType.STEREO;
@@ -340,8 +340,8 @@ export class BinaryOp extends Node {
         compileNode(this.right, state, refMap, ni);
         const bStereo = state.tosStereo;
         if ((state.tosStereo ||= aStereo)) {
-            if (!aStereo) state.p.splice(aIndex, 0, [Opcode.STEREO_DOUBLE_WIDEN]);
-            if (!bStereo) state.p.push([Opcode.STEREO_DOUBLE_WIDEN]);
+            if (!aStereo) makeStereoAtIndex(state.p, aIndex);
+            if (!bStereo) makeStereoAtIndex(state.p);
         }
         state.p.push([state.tosStereo ? Opcode.DO_BINARY_OP_STEREO : Opcode.DO_BINARY_OP, this.op]);
     }
@@ -429,8 +429,8 @@ export class Conditional extends Node {
         compileNode(this.caseTrue, state, refMap, ni);
         const stereoT = state.tosStereo;
         if ((state.tosStereo ||= stereoF)) {
-            if (!stereoT) state.p.push([Opcode.STEREO_DOUBLE_WIDEN]);
-            if (!stereoF) state.p.splice(stereoI, 0, [Opcode.STEREO_DOUBLE_WIDEN]);
+            if (!stereoT) makeStereoAtIndex(state.p, stereoI);
+            if (!stereoF) makeStereoAtIndex(state.p);
         }
         compileNode(this.cond, state, refMap, ni);
         if (state.tosStereo) {
@@ -464,7 +464,7 @@ export class PipePlaceholder extends Leaf {
     }
 }
 
-export class Block extends Node {
+export class Block extends NotCodeNode {
     constructor(trace: LocationTrace, public body: Node[]) { super(trace); }
     edgemost(left: boolean): Node { return this.body.length > 0 ? left ? this.body[0]!.edgemost(left) : this.body.at(-1)!.edgemost(left) : this; }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Block(this.loc, await asyncNodePipe(this.body, fn)); }
@@ -475,14 +475,6 @@ export class Block extends Node {
             else last = await v.eval(state);
         }
         return last;
-    }
-    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
-        for (var statement of this.body) {
-            compileNode(statement, state, refMap, ni);
-            state.p.push([Opcode.DROP_TOP]);
-        }
-        // *Don't* drop the last value
-        state.p.pop();
     }
 }
 
@@ -512,6 +504,15 @@ function scopeForName(name: string, state: EvalState) {
     return Object.hasOwn(state.env, name) ? state.env : Object.hasOwn(state.globalEnv, name) ? state.globalEnv : state.env;
 }
 
+function makeStereoAtIndex(prog: Program, index: number = prog.length) {
+    const entryThere = prog[index - 1]!;
+    if (entryThere[0] === Opcode.PUSH_CONSTANT && !isArray(entryThere[1])) {
+        entryThere[1] = [entryThere[1] as number, entryThere[1] as number];
+    } else {
+        prog.splice(index, 0, [Opcode.STEREO_DOUBLE_WIDEN]);
+    }
+}
+
 type ResultCacheEntry = [
     used: boolean, // whether this node is reffed multiple times
     index: number | null, // index into prog to insert tap - defined if node is completed and tap must be spliced in
@@ -526,18 +527,20 @@ export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Nod
     const entry = cache.get(node);
     const regname = "" + id(node);
     if (entry) {
+        // we have seen this node before
         if (!entry[0]) {
+            // we have seen this node the 2nd time
             entry[0] = true;
             // haven't assigned a tap yet
             if (entry[1] !== null) {
-                // ... but the node has been compiled in fully
+                // ... but we're not in this node's definition, so the tap point has already been passed
                 state.p.splice(entry[1], 0, [Opcode.TAP_REGISTER, allocRegister(regname, state)]);
                 // update nodes further down the line after this in the program
                 for (var e of cache.values()) {
                     if (e[0] && e[1] !== null && e[1] > entry[1]) e[1]++;
                 }
             } else {
-                // node has NOT been compiled in fully so tap point doesn't exist yet - this is a backreference!
+                // node has NOT been compiled in fully so tap point doesn't exist yet - this is a use-before-definition!
                 // we don't need to adjust any indices
             }
         } else {
@@ -552,11 +555,12 @@ export function compileNode(node: Node, state: CompiledVoiceData, cache: Map<Nod
         cache.set(node, myEntry);
         // Do the thing
         node.compile(state, cache, ni);
-        // Tap out if needed
+        myEntry[1] = state.p.length;
+        myEntry[2] = state.tosStereo;
+        // Tap out if requested previously
         if (myEntry[0]) {
             state.p.push([Opcode.TAP_REGISTER, allocRegister(regname, state)]);
         }
-        myEntry[1] = state.p.length;
     }
     return state;
 }

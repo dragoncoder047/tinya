@@ -87,9 +87,6 @@ export class Tone {
                 case Opcode.MARK_STILL_ALIVE:
                     this.alive = true;
                     break;
-                case Opcode.DROP_TOP:
-                    pop();
-                    break;
                 case Opcode.PUSH_FRESH_EMPTY_LIST:
                     push([]);
                     break;
