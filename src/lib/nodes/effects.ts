@@ -82,7 +82,7 @@ export const delay: NodeDef = [
             // len is always a power of 2
             if (delaySamples > len) {
                 var newLen = len << 1;
-                const newBuffer = new Float32Array(len);
+                const newBuffer = new Float32Array(newLen);
                 // poor man's memcpy to make it wrap right
                 // (.set() is just a singular memcpy with no wrapping)
                 for (var i = 0; i < len; i++) newBuffer[i] = buffer[(pos + i) & (len - 1)]!;
