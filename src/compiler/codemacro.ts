@@ -21,7 +21,7 @@ export function makeCodeMacroExpander(name: string, finalMacro: boolean, params:
                 var v: any = param.defaultValue;
                 if (isinstance(v, AST.DefaultPlaceholder)) v = null;
                 fakeNodeDef[1].push([param.name, v]);
-                fakeNodeDef[3].push(await param.enumOptions.toJS(state) as any);
+                fakeNodeDef[3].push((await param.enumOptions.eval(state)).toImmediate());
                 shouldEvalParam.push(!param.lazy);
             } else throw new RuntimeError("unreachable", param.loc, AST.stackToNotes(state.callstack));
         }

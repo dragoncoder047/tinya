@@ -1,7 +1,7 @@
 import { id, isinstance, str } from "../utils";
 import { processArgsInCall } from "./call";
 import { makeCodeMacroExpander } from "./codemacro";
-import { ResultCacheEntry, compileNode, makeStereoAtIndex } from "./compile";
+import { compileNode, makeStereoAtIndex, ResultCacheEntry } from "./compile";
 import { CompileError, ErrorNote, LocationTrace, RuntimeError } from "./errors";
 import { EvalState, NodeDef, NodeValueType, pushNamed } from "./evalState";
 import { OPERATORS } from "./operator";
@@ -14,6 +14,15 @@ export abstract class Node {
     abstract pipe(fn: (node: Node) => Promise<Node>): Promise<Node>;
     abstract eval(state: EvalState): Promise<Node>;
     abstract compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]): void;
+    static checkImmediate(x: Node): x is Value | Symbol | ContainerNode {
+        return isinstance(x, Value) || isinstance(x, Symbol) || (isinstance(x, ContainerNode) && x.isImmediate());
+    }
+    static getValueOf(x: Node): any | undefined {
+        if (Node.checkImmediate(x)) {
+            if (isinstance(x, Value) || isinstance(x, Symbol)) return x.value;
+            return x.toImmediate();
+        }
+    }
 }
 
 export abstract class NotCodeNode extends Node {
@@ -207,7 +216,20 @@ export class Call extends Node {
     }
 }
 
-export class List extends Node {
+abstract class ContainerNode extends Node {
+    abstract isImmediate(): boolean;
+    abstract toImmediate(): any | undefined;
+    static fromImmediate(trace: LocationTrace, m: any): List | Value | Mapping {
+        return Array.isArray(m)
+            ? new List(trace, m.map(r => ContainerNode.fromImmediate(trace, r)))
+            : typeof m === "object"
+                ? new Mapping(trace, Object.entries(m).map(([k, v]) =>
+                    ({ key: new Symbol(trace, k), val: ContainerNode.fromImmediate(trace, v) })))
+                : new Value(trace, m);
+    }
+}
+
+export class List extends ContainerNode {
     constructor(trace: LocationTrace, public values: Node[]) { super(trace); };
     edgemost(left: boolean): Node { return this.values.length > 0 ? left ? this.values[0]!.edgemost(left) : this.values.at(-1)!.edgemost(left) : this; }
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new List(this.loc, await asyncNodePipe(this.values, fn)); }
@@ -227,15 +249,12 @@ export class List extends Node {
         return this.values.some(v => isinstance(v, SplatValue));
     }
     isImmediate(): boolean {
-        return this.values.every(v => isinstance(v, Value) || (isinstance(v, List) && v.isImmediate()));
+        return this.values.every(v => isinstance(v, Value) || (isinstance(v, ContainerNode) && v.isImmediate()));
     }
     toImmediate(): any[] | undefined {
         if (this.isImmediate()) {
-            return this.values.map(v => isinstance(v, Value) ? v.value : (v as List).toImmediate());
+            return this.values.map(v => Node.getValueOf(v));
         }
-    }
-    static fromImmediate(trace: LocationTrace, m: any[]): List | Value {
-        return Array.isArray(m) ? new List(trace, m.map(r => List.fromImmediate(trace, r))) : new Value(trace, m);
     }
     compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]) {
         if (this.isImmediate()) {
@@ -253,6 +272,42 @@ export class List extends Node {
             }
         }
         state.tosStereo = this.values.length === 2;
+    }
+}
+
+
+export class Mapping extends ContainerNode {
+    constructor(trace: LocationTrace, public mapping: { key: Node, val: Node }[]) { super(trace); }
+    edgemost(left: boolean): Node { return this.mapping.length > 0 ? left ? this.mapping[0]!.key.edgemost(left) : this.mapping.at(-1)!.val.edgemost(left) : this; }
+    async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) }))); }
+    async eval(state: EvalState) {
+        return new Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) }))));
+    }
+    isImmediate() {
+        return this.mapping.every(m => Node.checkImmediate(m.key) && Node.checkImmediate(m.val));
+    }
+    toImmediate() {
+        if (this.isImmediate()) {
+            const out: Record<string, any> = {};
+            const imm = Node.getValueOf;
+            for (var { key, val } of this.mapping) {
+                out[imm(key)] = imm(val);
+            }
+            return out;
+        }
+    }
+    compile(state: CompiledVoiceData, refMap: Map<Node, ResultCacheEntry>, ni: NodeDef[]): void {
+        if (this.isImmediate()) {
+            state.p.push([Opcode.PUSH_CONSTANT, this.toImmediate()]);
+        } else {
+            state.p.push([Opcode.PUSH_FRESH_EMPTY_MAP]);
+            for (var { key, val } of this.mapping) {
+                compileNode(key, state, refMap, ni);
+                compileNode(val, state, refMap, ni);
+                state.p.push([Opcode.ADD_TO_MAP]);
+            }
+        }
+        state.tosStereo = false;
     }
 }
 
@@ -312,26 +367,22 @@ export class BinaryOp extends Node {
     private _applied(left: Node, right: Node) {
         var fn: (typeof OPERATORS)[keyof typeof OPERATORS]["cb"] | undefined;
         var imm = true, a, b;
-        if (isinstance(left, Value)) {
-            a = left.value;
-        } else if (isinstance(left, List) && left.isImmediate()) {
-            a = left.toImmediate();
+        if (Node.checkImmediate(left)) {
+            a = Node.getValueOf(left);
         } else {
             imm = false;
         }
-        if (isinstance(right, Value)) {
-            b = right.value;
-        } else if (isinstance(right, List) && right.isImmediate()) {
-            b = right.toImmediate();
+        if (Node.checkImmediate(right)) {
+            b = Node.getValueOf(right);
         } else {
             imm = false;
         }
         if ((fn = OPERATORS[this.op]?.cb) && imm) {
-            return List.fromImmediate(this.loc, fn(a, b))
+            return ContainerNode.fromImmediate(this.loc, fn(a, b))
         }
         // Special case for comparing in/equality of 2 symbols
         if (isinstance(left, Symbol) && isinstance(right, Symbol) && /^[!=]=$/.test(this.op)) {
-            return List.fromImmediate(this.loc, fn!(left.value, b.value));
+            return ContainerNode.fromImmediate(this.loc, fn!(left.value, b.value));
         }
         return new BinaryOp(this.loc, this.op, left, right);
     }
@@ -359,15 +410,13 @@ export class UnaryOp extends Node {
     private _applied(val: Node): Node {
         var fn: (typeof OPERATORS)[keyof typeof OPERATORS]["cu"] | undefined;
         var imm = true, value;
-        if (isinstance(val, Value)) {
-            value = val.value;
-        } else if (isinstance(val, List) && val.isImmediate()) {
-            value = val.toImmediate();
+        if (Node.checkImmediate(val)) {
+            value = Node.getValueOf(val);
         } else {
             imm = false;
         }
         if (imm && (fn = OPERATORS[this.op]?.cu)) {
-            return List.fromImmediate(this.loc, fn(value));
+            return ContainerNode.fromImmediate(this.loc, fn(value));
         }
         return new UnaryOp(this.loc, this.op, val);
     }
@@ -389,25 +438,6 @@ export class KeywordArgument extends NotCodeNode {
     async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new KeywordArgument(this.loc, this.name, await fn(this.arg)); }
     async eval(state: EvalState) {
         return new KeywordArgument(this.loc, this.name, await this.arg.eval(state));
-    }
-}
-
-export class Mapping extends NotCodeNode {
-    constructor(trace: LocationTrace, public mapping: { key: Node, val: Node }[]) { super(trace); }
-    edgemost(left: boolean): Node { return this.mapping.length > 0 ? left ? this.mapping[0]!.key.edgemost(left) : this.mapping.at(-1)!.val.edgemost(left) : this; }
-    async pipe(fn: (node: Node) => Promise<Node>): Promise<Node> { return new Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) }))); }
-    async eval(state: EvalState) {
-        return new Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) }))));
-    }
-    async toJS(state: EvalState): Promise<Record<string, Node>> {
-        const out: Record<string, Node> = {};
-        for (var { key, val } of this.mapping) {
-            if (!isinstance(key, Symbol)) {
-                throw new Error("unreachable");
-            }
-            out[key.value] = await val.eval(state);
-        }
-        return out;
     }
 }
 

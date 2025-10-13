@@ -2,7 +2,7 @@ import { AutomatedValueMethod } from "../runtime/automation";
 
 export enum Opcode {
     NOOP,
-    /** next is the constant */
+    /** the constant */
     PUSH_CONSTANT,
     PUSH_INPUT_SAMPLES,
     PUSH_PITCH,
@@ -12,29 +12,31 @@ export enum Opcode {
     PUSH_FRESH_EMPTY_LIST,
     APPEND_TO_LIST,
     EXTEND_TO_LIST,
-    /** next is opcode */
+    PUSH_FRESH_EMPTY_MAP,
+    ADD_TO_MAP,
+    /** opcode */
     DO_BINARY_OP,
     DO_BINARY_OP_STEREO,
-    /** next is opcode */
+    /** opcode */
     DO_UNARY_OP,
     DO_UNARY_OP_STEREO,
-    /** next is register no. */
+    /** register no. */
     GET_REGISTER,
-    /** next is register no. */
+    /** register no. */
     TAP_REGISTER,
     SHIFT_REGISTER,
     CONDITIONAL_SELECT,
     /** doubles the sample into a [sample, sample] left right pair */
     STEREO_DOUBLE_WIDEN,
-    /** next 2 is node no, argc */
+    /** node no, argc */
     APPLY_NODE,
-    /** next 3 is node no A and B, argc */
+    /** node no A and B, argc */
     APPLY_DOUBLE_NODE_STEREO,
-    /** next is input number, returns 0 if doesn't exist */
+    /** input number, returns 0 if doesn't exist */
     GET_MOD,
 }
 
-type Command = [Opcode, a?: number | string | [number, number], b?: number, c?: number];
+type Command = [Opcode, arg?: any, b?: number, c?: number];
 export type Program = Command[];
 
 export interface CompiledVoiceData {

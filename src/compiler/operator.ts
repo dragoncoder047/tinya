@@ -63,21 +63,23 @@ export const OPERATORS: Record<string, Operator> = {
     "<=": op(7).code((a, b) => a <= b),
     "<": op(7).code((a, b) => a < b),
     "!=": op(7).code((a, b) => a != b),
+    // indexing
+    "->": op(8).code((a, b) => a[b]),
     // pipe
-    "|>": op(8),
+    "|>": op(9),
     // conditional in 2 parts (treated as binary and postprocessed for simplicity)
     // colon is also used for keyword arguments
-    ":": op(9, INVALID, true),
-    "?": op(10, INVALID, true),
+    ":": op(10, INVALID, true),
+    "?": op(11, INVALID, true),
     // assignment operator (no overloads and handles specially, just here so it can be parsed in the right spot)
-    "=": op(11),
+    "=": op(12),
     // mapping operator (for inside lists)
-    "=>": op(12),
+    "=>": op(13),
     // define operator (handled specially)
-    ":-": op(12),
+    ":-": op(13),
     // statement separator
-    ",": op(13).code((_, b) => b),
-    ";": op(13),
+    ",": op(14).code((_, b) => b),
+    ";": op(14),
 };
 
 export const OP_REGEX = new RegExp(`^(${Object.keys(OPERATORS).sort((a, b) => b.length - a.length).map(e => e.replaceAll(/([()[\]{}*+?|^$\\.])/g, "\\$1")).join("|")})`);

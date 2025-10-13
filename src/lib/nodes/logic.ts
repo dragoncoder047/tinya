@@ -28,7 +28,7 @@ export const shimmeredHelp: NodeHelp = {
 };
 export const integrator: NodeDef = [
     "integrate",
-    [["derivative", 0], ["resetClock", 0], ["resetValue", 0], ["boundaryMode", 1], ["low", -Infinity], ["high", Infinity], ["sampleMode", 1]],
+    [["derivative", null], ["resetClock", 0], ["resetValue", 0], ["boundaryMode", 1], ["low", -Infinity], ["high", Infinity], ["sampleMode", 1]],
     NodeValueType.NORMAL_OR_MONO,
     [, , , { clamp: 1, wrap: 0 }, , , { integrate: 1, accumulate: 0 }],
     () => {

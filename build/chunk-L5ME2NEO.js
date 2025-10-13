@@ -18,15 +18,18 @@ import {
   __name,
   abs,
   cos,
+  isArray,
   noise3,
   noise5,
   saw,
   sgn,
   sin,
+  sqrt,
   str,
   tan,
+  tanW,
   tri
-} from "./chunk-Y5AIDCJX.js";
+} from "./chunk-NGNJHJ5L.js";
 
 // src/lib/index.syd
 var sources = {
@@ -356,31 +359,57 @@ var _index3 = new Block(
 var ast = _index3;
 
 // src/lib/nodes/effects.ts
-var zzfxFilter = [
-  "zzfxFilter",
-  [["sample", null], ["cutoff", null], ["quality", 2]],
+var filter = [
+  "filter",
+  [["sample", null], ["cutoff", null], ["resonance", 2], ["kind", 0]],
   0 /* NORMAL_OR_MONO */,
-  [],
+  [, , , { lowpass: 0, highpass: 1, peak: 2 }],
   () => {
     var x2 = 0, x1 = 0, y2 = 0, y1 = 0;
     return (dt, args) => {
-      const sample = args[0], cutoff = args[1], quality = args[2];
-      var w = TAU * abs(cutoff) * 2 * dt, cos_ = cos(w), alpha = sin(w) / 2 / quality, a0 = 1 + alpha, a1 = -2 * cos_ / a0, a2 = (1 - alpha) / a0, b0 = (1 + sgn(cutoff) * cos_) / 2 / a0, b1 = -(sgn(cutoff) + cos_) / a0, b2 = b0;
+      const sample = args[0], cutoff = args[1], resonance = args[2], kind = args[3];
+      const cornerRadiansPerSample = TAU * cutoff * dt;
+      var alpha, a0, a1, a2, b0, b1, b2, sign, sqrtGain, bandwidth;
+      const cos2 = cos(cornerRadiansPerSample);
+      switch (kind) {
+        case 0 /* LOWPASS */:
+        case 1 /* HIGHPASS */:
+          alpha = sin(cornerRadiansPerSample) / 2 / resonance;
+          a0 = 1 + alpha;
+          sign = kind === 1 /* HIGHPASS */ ? -1 : 1;
+          a1 = -2 * cos2 / a0;
+          a2 = (1 - alpha) / a0;
+          b2 = b0 = (1 - cos2 * sign) / 2 / a0;
+          b1 = sign * 2 * b0;
+          break;
+        case 2 /* PEAK */:
+        default:
+          sqrtGain = sqrt(resonance);
+          bandwidth = cornerRadiansPerSample / (sqrtGain < 1 ? 1 / sqrtGain : sqrtGain);
+          alpha = tan(bandwidth / 2);
+          a0 = 1 + alpha / sqrtGain;
+          b0 = (1 + alpha * sqrtGain) / a0;
+          b1 = a1 = -2 * cos2 / a0;
+          b2 = (1 - alpha * sqrtGain) / a0;
+          a2 = (1 - alpha / sqrtGain) / a0;
+      }
       return y1 = b2 * x2 + b1 * (x2 = x1) + b0 * (x1 = sample) - a2 * y2 - a1 * (y2 = y1);
     };
   }
 ];
-var zzfxFilterHelp = {
-  description: "Combination biquad low-pass / high-pass filter as implemented in ZzFX.",
+var filterHelp = {
+  description: "Biquad filter as implemented in BeepBox.",
   parameters: {
     cutoff: {
-      range: [-1e4, 1e4],
-      unit: "Hz",
-      description: "The cutoff frequency of the filter. The sign decides between high-pass (>=0) and low-pass (<0) and the magnitude is the cutoff frequency."
+      range: [0, 1e4],
+      unit: "Hz"
     },
     quality: {
       range: [0, 100],
-      description: "Affects the resonance of the filter."
+      description: "Affects the resonance of the filter. 1 means no resonance, >1 causes the filter to emphasize frequencies around the cutoff point, <1 causes the stopband slope to decrease and flatten. The default is 2 to match ZzFX's filter parameter."
+    },
+    kind: {
+      description: "Selects what band the filter will process. A low-pass filter dampens frequencies higher than the cutoff, making the sound more muffled. A high-pass filter dampens frequencies below the cutoff, making the sound more tinny. A peak filter enhances or dampens frequencies close to the cutoff, adding or suppressing shrieks at that point."
     }
   }
 };
@@ -403,7 +432,7 @@ var bitcrusher = [
   }
 ];
 var bitcrusherHelp = {
-  description: "The classic low-fidelity effect produced by resampling the audio at a lower sample rate.",
+  description: "The classic low-fidelity effect produced by resampling the audio at a lower sample rate. Called 'frequency crush' in BeepBox.",
   parameters: {
     sampleRate: {
       range: [1, 48e3],
@@ -459,7 +488,7 @@ var zzfxOscillator = [
     var phase = 0, sampleNo = 0;
     return (dt, args) => {
       const frequency = args[0], shape = args[1], distortion = args[2], noise = args[3], phaseMod = args[4];
-      const sample = (shape > 3 ? noise3 : shape > 2 ? tan : shape > 1 ? saw : shape ? tri : sin)(phaseMod * TAU + (phase += frequency * TAU * dt * (1 + noise * noise5(sampleNo++))));
+      const sample = (shape > 3 ? noise3 : shape > 2 ? tanW : shape > 1 ? saw : shape ? tri : sin)(phaseMod * TAU + (phase += frequency * TAU * dt * (1 + noise * noise5(sampleNo++))));
       return sgn(sample) * abs(sample) ** distortion;
     };
   }
@@ -519,7 +548,7 @@ var shimmeredHelp = {
 };
 var integrator = [
   "integrate",
-  [["derivative", 0], ["resetClock", 0], ["resetValue", 0], ["boundaryMode", 1], ["low", -Infinity], ["high", Infinity], ["sampleMode", 1]],
+  [["derivative", null], ["resetClock", 0], ["resetValue", 0], ["boundaryMode", 1], ["low", -Infinity], ["high", Infinity], ["sampleMode", 1]],
   0 /* NORMAL_OR_MONO */,
   [, , , { clamp: 1, wrap: 0 }, , , { integrate: 1, accumulate: 0 }],
   () => {
@@ -592,7 +621,7 @@ var clockHelp = {
 function nodes() {
   return [
     zzfxOscillator,
-    zzfxFilter,
+    filter,
     bitcrusher,
     delay,
     shimmered,
@@ -627,7 +656,7 @@ __name(passthroughFx, "passthroughFx");
 function nodeHelp() {
   return {
     zzfxOscillator: zzfxOscillatorHelp,
-    zzfxFilter: zzfxFilterHelp,
+    filterHelp,
     bitcrusher: bitcrusherHelp,
     delay: delayHelp,
     shimmered: shimmeredHelp,
@@ -696,18 +725,20 @@ function disassemble(data) {
   }, "nNode");
   const stack = [];
   var noopCount = 0;
+  const s = /* @__PURE__ */ __name((x) => isArray(x) ? `[${x.map(s)}]` : "" + x, "s");
   mainloop: for (var command of prog) {
     const opName = Opcode[command[0]];
     var arg = [];
     var dependents = 0;
     switch (command[0]) {
+      // @ts-ignore
       case 0 /* NOOP */:
         noopCount++;
         stack.push([opName]);
         continue mainloop;
       // @ts-ignore
       case 1 /* PUSH_CONSTANT */:
-        arg = [str(command[1])];
+        arg = [s(command[1])];
       case 2 /* PUSH_INPUT_SAMPLES */:
       case 3 /* PUSH_PITCH */:
       case 4 /* PUSH_EXPRESSION */:
@@ -720,42 +751,48 @@ function disassemble(data) {
       case 9 /* EXTEND_TO_LIST */:
         dependents = 2;
         break;
-      case 10 /* DO_BINARY_OP */:
-      case 11 /* DO_BINARY_OP_STEREO */:
-        arg = [str(command[1])];
-        dependents = 2;
-        break;
-      case 12 /* DO_UNARY_OP */:
-      case 13 /* DO_UNARY_OP_STEREO */:
-        arg = [str(command[1])];
-        dependents = 1;
-        break;
-      case 14 /* GET_REGISTER */:
-        arg = [str(command[1])];
+      case 10 /* PUSH_FRESH_EMPTY_MAP */:
         dependents = 0;
         break;
-      case 15 /* TAP_REGISTER */:
-      case 16 /* SHIFT_REGISTER */:
-        arg = [str(command[1])];
-        dependents = 1;
-        break;
-      case 17 /* CONDITIONAL_SELECT */:
+      case 11 /* ADD_TO_MAP */:
         dependents = 3;
         break;
-      case 18 /* STEREO_DOUBLE_WIDEN */:
+      case 12 /* DO_BINARY_OP */:
+      case 13 /* DO_BINARY_OP_STEREO */:
+        arg = [s(command[1])];
+        dependents = 2;
+        break;
+      case 14 /* DO_UNARY_OP */:
+      case 15 /* DO_UNARY_OP_STEREO */:
+        arg = [s(command[1])];
         dependents = 1;
         break;
-      case 19 /* APPLY_NODE */:
-        dependents = command[2];
-        arg = [nNode(command[1]), str(command[2]) + " args"];
-        break;
-      case 21 /* GET_MOD */:
-        arg = [str(command[1])];
+      case 16 /* GET_REGISTER */:
+        arg = [s(command[1])];
         dependents = 0;
         break;
-      case 20 /* APPLY_DOUBLE_NODE_STEREO */:
+      case 17 /* TAP_REGISTER */:
+      case 18 /* SHIFT_REGISTER */:
+        arg = [s(command[1])];
+        dependents = 1;
+        break;
+      case 19 /* CONDITIONAL_SELECT */:
+        dependents = 3;
+        break;
+      case 20 /* STEREO_DOUBLE_WIDEN */:
+        dependents = 1;
+        break;
+      case 21 /* APPLY_NODE */:
         dependents = command[2];
-        arg = [nNode(command[1]), nNode(command[2]), str(command[1]) + " args"];
+        arg = [nNode(command[1]), s(command[2]) + " args"];
+        break;
+      case 23 /* GET_MOD */:
+        arg = [s(command[1])];
+        dependents = 0;
+        break;
+      case 22 /* APPLY_DOUBLE_NODE_STEREO */:
+        dependents = command[2];
+        arg = [nNode(command[1]), nNode(command[2]), s(command[1]) + " args"];
         break;
       default:
         command[0];
@@ -796,4 +833,4 @@ export {
   disassemble,
   initWorklet
 };
-//# sourceMappingURL=chunk-SAXBY6KL.js.map
+//# sourceMappingURL=chunk-L5ME2NEO.js.map

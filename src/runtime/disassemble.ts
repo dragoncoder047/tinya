@@ -1,5 +1,5 @@
 import { CompiledVoiceData, Opcode } from "../compiler/prog";
-import { str } from "../utils";
+import { isArray } from "../utils";
 
 export function disassemble(data: CompiledVoiceData): string {
     const prog = data.p;
@@ -8,18 +8,20 @@ export function disassemble(data: CompiledVoiceData): string {
     }
     const stack: [string, ...any][] = [];
     var noopCount = 0;
+    const s = (x: any): string => isArray(x) ? `[${x.map(s)}]` : "" + x;
     mainloop: for (var command of prog) {
         const opName = Opcode[command[0]];
         var arg: string[] = [];
         var dependents: number = 0;
         switch (command[0]) {
+            // @ts-ignore
             case Opcode.NOOP:
                 noopCount++;
                 stack.push([opName]);
                 continue mainloop;
             // @ts-ignore
             case Opcode.PUSH_CONSTANT:
-                arg = [str(command[1])];
+                arg = [s(command[1])];
             case Opcode.PUSH_INPUT_SAMPLES:
             case Opcode.PUSH_PITCH:
             case Opcode.PUSH_EXPRESSION:
@@ -32,23 +34,29 @@ export function disassemble(data: CompiledVoiceData): string {
             case Opcode.EXTEND_TO_LIST:
                 dependents = 2;
                 break;
+            case Opcode.PUSH_FRESH_EMPTY_MAP:
+                dependents = 0;
+                break;
+            case Opcode.ADD_TO_MAP:
+                dependents = 3;
+                break;
             case Opcode.DO_BINARY_OP:
             case Opcode.DO_BINARY_OP_STEREO:
-                arg = [str(command[1])];
+                arg = [s(command[1])];
                 dependents = 2;
                 break;
             case Opcode.DO_UNARY_OP:
             case Opcode.DO_UNARY_OP_STEREO:
-                arg = [str(command[1])];
+                arg = [s(command[1])];
                 dependents = 1;
                 break;
             case Opcode.GET_REGISTER:
-                arg = [str(command[1])];
+                arg = [s(command[1])];
                 dependents = 0;
                 break;
             case Opcode.TAP_REGISTER:
             case Opcode.SHIFT_REGISTER:
-                arg = [str(command[1])];
+                arg = [s(command[1])];
                 dependents = 1;
                 break;
             case Opcode.CONDITIONAL_SELECT:
@@ -59,15 +67,15 @@ export function disassemble(data: CompiledVoiceData): string {
                 break;
             case Opcode.APPLY_NODE:
                 dependents = command[2] as number;
-                arg = [nNode(command[1] as number), str(command[2]) + " args"];
+                arg = [nNode(command[1] as number), s(command[2]) + " args"];
                 break;
             case Opcode.GET_MOD:
-                arg = [str(command[1])];
+                arg = [s(command[1])];
                 dependents = 0;
                 break;
             case Opcode.APPLY_DOUBLE_NODE_STEREO:
                 dependents = command[2] as number;
-                arg = [nNode(command[1] as number), nNode(command[2] as number), str(command[1]) + " args"];
+                arg = [nNode(command[1] as number), nNode(command[2] as number), s(command[1]) + " args"];
                 break;
             default:
                 command[0] satisfies never;

@@ -52,7 +52,6 @@ export async function processArgsInCall(state: EvalState, doEvalArgs: boolean, s
             throw new RuntimeError("splats are only valid in a list", arg.loc, AST.stackToNotes(state.callstack));
         } else if (doEvalArgs) {
             value = await value.eval(state);
-            if (value.hasNodes) throw new RuntimeError("cannot use value dependent on audio node output in compile-time calculation", value.loc);
         }
         newArgs[argIndex] = value;
     }

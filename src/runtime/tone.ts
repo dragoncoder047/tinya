@@ -100,6 +100,14 @@ export class Tone {
                     a = pop();
                     peek().push(...a);
                     break;
+                case Opcode.PUSH_FRESH_EMPTY_MAP:
+                    push({});
+                    break;
+                case Opcode.ADD_TO_MAP:
+                    c = pop();
+                    b = pop();
+                    peek()[b] = c;
+                    break;
                 case Opcode.DO_BINARY_OP:
                 case Opcode.DO_BINARY_OP_STEREO:
                     b = pop();

@@ -166,7 +166,6 @@ async function processArgsInCall(state, doEvalArgs, site, args, nodeImpl) {
       throw new RuntimeError("splats are only valid in a list", arg.loc, stackToNotes(state.callstack));
     } else if (doEvalArgs) {
       value = await value.eval(state);
-      if (value.hasNodes) throw new RuntimeError("cannot use value dependent on audio node output in compile-time calculation", value.loc);
     }
     newArgs[argIndex] = value;
   }
@@ -206,7 +205,7 @@ function makeCodeMacroExpander(name, finalMacro, params, body) {
         var v = param.defaultValue;
         if (isinstance(v, DefaultPlaceholder)) v = null;
         fakeNodeDef[1].push([param.name, v]);
-        fakeNodeDef[3].push(await param.enumOptions.toJS(state));
+        fakeNodeDef[3].push((await param.enumOptions.eval(state)).toImmediate());
         shouldEvalParam.push(!param.lazy);
       } else throw new RuntimeError("unreachable", param.loc, stackToNotes(state.callstack));
     }
@@ -237,12 +236,14 @@ var PI = Math.PI;
 var TAU = 2 * PI;
 var min = Math.min;
 var max = Math.max;
+var sqrt = Math.sqrt;
 var clamp = /* @__PURE__ */ __name((x, y, z) => max(min(x, z), y), "clamp");
 var sin = Math.sin;
 var cos = Math.cos;
 var sgn = Math.sign;
 var abs = Math.abs;
-var tan = /* @__PURE__ */ __name((x) => clamp(Math.tan(x), -1, 1), "tan");
+var tan = Math.tan;
+var tanW = /* @__PURE__ */ __name((x) => clamp(Math.tan(x), -1, 1), "tanW");
 var saw = /* @__PURE__ */ __name((x) => 1 - (2 * x / TAU % 2 + 2) % 2, "saw");
 var tri = /* @__PURE__ */ __name((x) => 1 - 4 * abs(Math.round(x / TAU) - x / TAU), "tri");
 var noise3 = /* @__PURE__ */ __name((x) => sin(x ** 3), "noise3");
@@ -322,21 +323,23 @@ var OPERATORS = {
   "<=": op(7).code((a, b) => a <= b),
   "<": op(7).code((a, b) => a < b),
   "!=": op(7).code((a, b) => a != b),
+  // indexing
+  "->": op(8).code((a, b) => a[b]),
   // pipe
-  "|>": op(8),
+  "|>": op(9),
   // conditional in 2 parts (treated as binary and postprocessed for simplicity)
   // colon is also used for keyword arguments
-  ":": op(9, INVALID, true),
-  "?": op(10, INVALID, true),
+  ":": op(10, INVALID, true),
+  "?": op(11, INVALID, true),
   // assignment operator (no overloads and handles specially, just here so it can be parsed in the right spot)
-  "=": op(11),
+  "=": op(12),
   // mapping operator (for inside lists)
-  "=>": op(12),
+  "=>": op(13),
   // define operator (handled specially)
-  ":-": op(12),
+  ":-": op(13),
   // statement separator
-  ",": op(13).code((_, b) => b),
-  ";": op(13)
+  ",": op(14).code((_, b) => b),
+  ";": op(14)
 };
 var OP_REGEX = new RegExp(`^(${Object.keys(OPERATORS).sort((a, b) => b.length - a.length).map((e) => e.replaceAll(/([()[\]{}*+?|^$\\.])/g, "\\$1")).join("|")})`);
 function getPrecedence(token, unary) {
@@ -370,18 +373,20 @@ var Opcode = /* @__PURE__ */ ((Opcode2) => {
   Opcode2[Opcode2["PUSH_FRESH_EMPTY_LIST"] = 7] = "PUSH_FRESH_EMPTY_LIST";
   Opcode2[Opcode2["APPEND_TO_LIST"] = 8] = "APPEND_TO_LIST";
   Opcode2[Opcode2["EXTEND_TO_LIST"] = 9] = "EXTEND_TO_LIST";
-  Opcode2[Opcode2["DO_BINARY_OP"] = 10] = "DO_BINARY_OP";
-  Opcode2[Opcode2["DO_BINARY_OP_STEREO"] = 11] = "DO_BINARY_OP_STEREO";
-  Opcode2[Opcode2["DO_UNARY_OP"] = 12] = "DO_UNARY_OP";
-  Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 13] = "DO_UNARY_OP_STEREO";
-  Opcode2[Opcode2["GET_REGISTER"] = 14] = "GET_REGISTER";
-  Opcode2[Opcode2["TAP_REGISTER"] = 15] = "TAP_REGISTER";
-  Opcode2[Opcode2["SHIFT_REGISTER"] = 16] = "SHIFT_REGISTER";
-  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 17] = "CONDITIONAL_SELECT";
-  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 18] = "STEREO_DOUBLE_WIDEN";
-  Opcode2[Opcode2["APPLY_NODE"] = 19] = "APPLY_NODE";
-  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 20] = "APPLY_DOUBLE_NODE_STEREO";
-  Opcode2[Opcode2["GET_MOD"] = 21] = "GET_MOD";
+  Opcode2[Opcode2["PUSH_FRESH_EMPTY_MAP"] = 10] = "PUSH_FRESH_EMPTY_MAP";
+  Opcode2[Opcode2["ADD_TO_MAP"] = 11] = "ADD_TO_MAP";
+  Opcode2[Opcode2["DO_BINARY_OP"] = 12] = "DO_BINARY_OP";
+  Opcode2[Opcode2["DO_BINARY_OP_STEREO"] = 13] = "DO_BINARY_OP_STEREO";
+  Opcode2[Opcode2["DO_UNARY_OP"] = 14] = "DO_UNARY_OP";
+  Opcode2[Opcode2["DO_UNARY_OP_STEREO"] = 15] = "DO_UNARY_OP_STEREO";
+  Opcode2[Opcode2["GET_REGISTER"] = 16] = "GET_REGISTER";
+  Opcode2[Opcode2["TAP_REGISTER"] = 17] = "TAP_REGISTER";
+  Opcode2[Opcode2["SHIFT_REGISTER"] = 18] = "SHIFT_REGISTER";
+  Opcode2[Opcode2["CONDITIONAL_SELECT"] = 19] = "CONDITIONAL_SELECT";
+  Opcode2[Opcode2["STEREO_DOUBLE_WIDEN"] = 20] = "STEREO_DOUBLE_WIDEN";
+  Opcode2[Opcode2["APPLY_NODE"] = 21] = "APPLY_NODE";
+  Opcode2[Opcode2["APPLY_DOUBLE_NODE_STEREO"] = 22] = "APPLY_DOUBLE_NODE_STEREO";
+  Opcode2[Opcode2["GET_MOD"] = 23] = "GET_MOD";
   return Opcode2;
 })(Opcode || {});
 function allocRegister(name, state) {
@@ -396,7 +401,7 @@ function allocNode(name, state) {
 __name(allocNode, "allocNode");
 
 // src/compiler/ast.ts
-var Node = class {
+var Node = class _Node {
   constructor(loc) {
     this.loc = loc;
     this.id = id(this);
@@ -405,6 +410,15 @@ var Node = class {
     __name(this, "Node");
   }
   id;
+  static checkImmediate(x) {
+    return isinstance(x, Value) || isinstance(x, Symbol2) || isinstance(x, ContainerNode) && x.isImmediate();
+  }
+  static getValueOf(x) {
+    if (_Node.checkImmediate(x)) {
+      if (isinstance(x, Value) || isinstance(x, Symbol2)) return x.value;
+      return x.toImmediate();
+    }
+  }
 };
 var NotCodeNode = class extends Node {
   static {
@@ -528,7 +542,7 @@ var Assignment = class _Assignment extends Node {
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
-    state.p.push([15 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
+    state.p.push([17 /* TAP_REGISTER */, allocRegister(this.target.name, state)]);
   }
 };
 var Name = class extends Leaf {
@@ -547,7 +561,7 @@ var Name = class extends Leaf {
     return val;
   }
   compile(state, refMap, ni) {
-    state.p.push([14 /* GET_REGISTER */, allocRegister(this.name, state)]);
+    state.p.push([16 /* GET_REGISTER */, allocRegister(this.name, state)]);
   }
 };
 var LateBinding = class extends Name {
@@ -565,8 +579,8 @@ var LateBinding = class extends Name {
     compileNode(this.boundValue, state, refMap, ni);
     const myRegname = "" + id(this.boundValue);
     const last = state.p.at(-1);
-    if (!(last[0] === 14 /* GET_REGISTER */ && state.r[last[1]] === myRegname)) {
-      state.p.push([16 /* SHIFT_REGISTER */, allocRegister(myRegname, state)]);
+    if (!(last[0] === 16 /* GET_REGISTER */ && state.r[last[1]] === myRegname)) {
+      state.p.push([18 /* SHIFT_REGISTER */, allocRegister(myRegname, state)]);
     }
   }
 };
@@ -616,7 +630,7 @@ var Call = class _Call extends Node {
       argProgs.push([state.p, state.tosStereo ? 1 /* STEREO */ : 0 /* NORMAL_OR_MONO */]);
     }
     state.p = existingProg;
-    const callProg = [19 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
+    const callProg = [21 /* APPLY_NODE */, allocNode(this.name, state), nodeImpl[1].length];
     state.tosStereo = nodeImpl[2] === 1 /* STEREO */;
     if (nodeImpl[1].every((a) => a[2] !== 1 /* STEREO */) && argProgs.some((s) => s[1] === 1 /* STEREO */)) {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -626,7 +640,7 @@ var Call = class _Call extends Node {
         }
       }
       state.tosStereo = true;
-      callProg[0] = 20 /* APPLY_DOUBLE_NODE_STEREO */;
+      callProg[0] = 22 /* APPLY_DOUBLE_NODE_STEREO */;
       callProg.splice(2, 0, allocNode(this.name, state));
     } else {
       for (i = 0; i < nodeImpl[1].length; i++) {
@@ -646,7 +660,15 @@ var Call = class _Call extends Node {
     state.p.push(callProg);
   }
 };
-var List = class _List extends Node {
+var ContainerNode = class _ContainerNode extends Node {
+  static {
+    __name(this, "ContainerNode");
+  }
+  static fromImmediate(trace, m) {
+    return Array.isArray(m) ? new List(trace, m.map((r) => _ContainerNode.fromImmediate(trace, r))) : typeof m === "object" ? new Mapping(trace, Object.entries(m).map(([k, v]) => ({ key: new Symbol2(trace, k), val: _ContainerNode.fromImmediate(trace, v) }))) : new Value(trace, m);
+  }
+};
+var List = class _List extends ContainerNode {
   constructor(trace, values) {
     super(trace);
     this.values = values;
@@ -676,15 +698,12 @@ var List = class _List extends Node {
     return this.values.some((v) => isinstance(v, SplatValue));
   }
   isImmediate() {
-    return this.values.every((v) => isinstance(v, Value) || isinstance(v, _List) && v.isImmediate());
+    return this.values.every((v) => isinstance(v, Value) || isinstance(v, ContainerNode) && v.isImmediate());
   }
   toImmediate() {
     if (this.isImmediate()) {
-      return this.values.map((v) => isinstance(v, Value) ? v.value : v.toImmediate());
+      return this.values.map((v) => Node.getValueOf(v));
     }
-  }
-  static fromImmediate(trace, m) {
-    return Array.isArray(m) ? new _List(trace, m.map((r) => _List.fromImmediate(trace, r))) : new Value(trace, m);
   }
   compile(state, refMap, ni) {
     if (this.isImmediate()) {
@@ -702,6 +721,50 @@ var List = class _List extends Node {
       }
     }
     state.tosStereo = this.values.length === 2;
+  }
+};
+var Mapping = class _Mapping extends ContainerNode {
+  constructor(trace, mapping) {
+    super(trace);
+    this.mapping = mapping;
+  }
+  static {
+    __name(this, "Mapping");
+  }
+  edgemost(left) {
+    return this.mapping.length > 0 ? left ? this.mapping[0].key.edgemost(left) : this.mapping.at(-1).val.edgemost(left) : this;
+  }
+  async pipe(fn) {
+    return new _Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) })));
+  }
+  async eval(state) {
+    return new _Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) }))));
+  }
+  isImmediate() {
+    return this.mapping.every((m) => Node.checkImmediate(m.key) && Node.checkImmediate(m.val));
+  }
+  toImmediate() {
+    if (this.isImmediate()) {
+      const out = {};
+      const imm = Node.getValueOf;
+      for (var { key, val } of this.mapping) {
+        out[imm(key)] = imm(val);
+      }
+      return out;
+    }
+  }
+  compile(state, refMap, ni) {
+    if (this.isImmediate()) {
+      state.p.push([1 /* PUSH_CONSTANT */, this.toImmediate()]);
+    } else {
+      state.p.push([10 /* PUSH_FRESH_EMPTY_MAP */]);
+      for (var { key, val } of this.mapping) {
+        compileNode(key, state, refMap, ni);
+        compileNode(val, state, refMap, ni);
+        state.p.push([11 /* ADD_TO_MAP */]);
+      }
+    }
+    state.tosStereo = false;
   }
 };
 var Definition = class _Definition extends NotCodeNode {
@@ -807,25 +870,21 @@ var BinaryOp = class _BinaryOp extends Node {
   _applied(left, right) {
     var fn;
     var imm = true, a, b;
-    if (isinstance(left, Value)) {
-      a = left.value;
-    } else if (isinstance(left, List) && left.isImmediate()) {
-      a = left.toImmediate();
+    if (Node.checkImmediate(left)) {
+      a = Node.getValueOf(left);
     } else {
       imm = false;
     }
-    if (isinstance(right, Value)) {
-      b = right.value;
-    } else if (isinstance(right, List) && right.isImmediate()) {
-      b = right.toImmediate();
+    if (Node.checkImmediate(right)) {
+      b = Node.getValueOf(right);
     } else {
       imm = false;
     }
     if ((fn = OPERATORS[this.op]?.cb) && imm) {
-      return List.fromImmediate(this.loc, fn(a, b));
+      return ContainerNode.fromImmediate(this.loc, fn(a, b));
     }
     if (isinstance(left, Symbol2) && isinstance(right, Symbol2) && /^[!=]=$/.test(this.op)) {
-      return List.fromImmediate(this.loc, fn(left.value, b.value));
+      return ContainerNode.fromImmediate(this.loc, fn(left.value, b.value));
     }
     return new _BinaryOp(this.loc, this.op, left, right);
   }
@@ -839,7 +898,7 @@ var BinaryOp = class _BinaryOp extends Node {
       if (!aStereo) makeStereoAtIndex(state.p, aIndex);
       if (!bStereo) makeStereoAtIndex(state.p);
     }
-    state.p.push([state.tosStereo ? 11 /* DO_BINARY_OP_STEREO */ : 10 /* DO_BINARY_OP */, this.op]);
+    state.p.push([state.tosStereo ? 13 /* DO_BINARY_OP_STEREO */ : 12 /* DO_BINARY_OP */, this.op]);
   }
 };
 var UnaryOp = class _UnaryOp extends Node {
@@ -863,21 +922,19 @@ var UnaryOp = class _UnaryOp extends Node {
   _applied(val) {
     var fn;
     var imm = true, value;
-    if (isinstance(val, Value)) {
-      value = val.value;
-    } else if (isinstance(val, List) && val.isImmediate()) {
-      value = val.toImmediate();
+    if (Node.checkImmediate(val)) {
+      value = Node.getValueOf(val);
     } else {
       imm = false;
     }
     if (imm && (fn = OPERATORS[this.op]?.cu)) {
-      return List.fromImmediate(this.loc, fn(value));
+      return ContainerNode.fromImmediate(this.loc, fn(value));
     }
     return new _UnaryOp(this.loc, this.op, val);
   }
   compile(state, refMap, ni) {
     compileNode(this.value, state, refMap, ni);
-    state.p.push([state.tosStereo ? 13 /* DO_UNARY_OP_STEREO */ : 12 /* DO_UNARY_OP */, this.op]);
+    state.p.push([state.tosStereo ? 15 /* DO_UNARY_OP_STEREO */ : 14 /* DO_UNARY_OP */, this.op]);
   }
 };
 var DefaultPlaceholder = class extends Leaf {
@@ -905,34 +962,6 @@ var KeywordArgument = class _KeywordArgument extends NotCodeNode {
   }
   async eval(state) {
     return new _KeywordArgument(this.loc, this.name, await this.arg.eval(state));
-  }
-};
-var Mapping = class _Mapping extends NotCodeNode {
-  constructor(trace, mapping) {
-    super(trace);
-    this.mapping = mapping;
-  }
-  static {
-    __name(this, "Mapping");
-  }
-  edgemost(left) {
-    return this.mapping.length > 0 ? left ? this.mapping[0].key.edgemost(left) : this.mapping.at(-1).val.edgemost(left) : this;
-  }
-  async pipe(fn) {
-    return new _Mapping(this.loc, await asyncNodePipe(this.mapping, async ({ key, val }) => ({ key: await fn(key), val: await fn(val) })));
-  }
-  async eval(state) {
-    return new _Mapping(this.loc, await Promise.all(this.mapping.map(async ({ key, val }) => ({ key: await key.eval(state), val: await val.eval(state) }))));
-  }
-  async toJS(state) {
-    const out = {};
-    for (var { key, val } of this.mapping) {
-      if (!isinstance(key, Symbol2)) {
-        throw new Error("unreachable");
-      }
-      out[key.value] = await val.eval(state);
-    }
-    return out;
   }
 };
 var Conditional = class _Conditional extends Node {
@@ -974,7 +1003,7 @@ var Conditional = class _Conditional extends Node {
     if (state.tosStereo) {
       throw new CompileError("cannot use stereo output as condition", this.cond.loc);
     }
-    state.p.push([17 /* CONDITIONAL_SELECT */]);
+    state.p.push([19 /* CONDITIONAL_SELECT */]);
   }
 };
 var InterpolatedValue = class _InterpolatedValue extends NotCodeNode {
@@ -1077,7 +1106,7 @@ function makeStereoAtIndex(prog, index = prog.length) {
   if (entryThere[0] === 1 /* PUSH_CONSTANT */ && !isArray(entryThere[1])) {
     entryThere[1] = [entryThere[1], entryThere[1]];
   } else {
-    prog.splice(index, 0, [18 /* STEREO_DOUBLE_WIDEN */]);
+    prog.splice(index, 0, [20 /* STEREO_DOUBLE_WIDEN */]);
   }
 }
 __name(makeStereoAtIndex, "makeStereoAtIndex");
@@ -1089,9 +1118,9 @@ function compileNode(node, state, cache, ni) {
   const entry = cache.get(node);
   const regname = "" + id(node);
   if (entry) {
-    entry.t[0] = 15 /* TAP_REGISTER */;
+    entry.t[0] = 17 /* TAP_REGISTER */;
     entry.t[1] = allocRegister(regname, state);
-    state.p.push([14 /* GET_REGISTER */, allocRegister(regname, state)]);
+    state.p.push([16 /* GET_REGISTER */, allocRegister(regname, state)]);
     state.tosStereo = entry.s;
   } else {
     const myEntry = { s: false, t: [0 /* NOOP */] };
@@ -1585,27 +1614,30 @@ var TRANSFORM_PASSES = [
     return new Definition(header.loc, header.name, isMacro, realParams, body);
   }, "expandDefinitions"),
   /* @__PURE__ */ __name(async function expandAssignments(ast) {
-    if (!isinstance(ast, BinaryOp) || ast.op !== "=" && !ast.assign) return ast.pipe(expandAssignments);
-    const target = await ast.left.pipe(expandAssignments);
-    var body = await ast.right.pipe(expandAssignments);
+    ast = await ast.pipe(expandAssignments);
+    if (!isinstance(ast, BinaryOp) || ast.op !== "=" && !ast.assign) return ast;
+    const target = ast.left;
+    var body = ast.right;
     if (ast.assign) {
       body = new BinaryOp(ast.loc, ast.op, target, body);
     }
     return new Assignment(target.loc, target, body);
   }, "expandAssignments"),
   /* @__PURE__ */ __name(async function expandTernaryOperators(ast) {
-    if (!isinstance(ast, BinaryOp) || ast.op !== "?") return ast.pipe(expandTernaryOperators);
-    const condition = await ast.left.pipe(expandTernaryOperators);
-    const choices = await ast.right.pipe(expandTernaryOperators);
+    ast = await ast.pipe(expandTernaryOperators);
+    if (!isinstance(ast, BinaryOp) || ast.op !== "?") return ast;
+    const condition = ast.left;
+    const choices = ast.right;
     if (!isinstance(choices, BinaryOp) || choices.op !== ":") {
       throw new ParseError('expected ":" after expression', (isinstance(choices, BinaryOp) ? choices : choices.edgemost(false)).loc, [new ErrorNote('note: "?" is here:', ast.loc)]);
     }
     return new Conditional(ast.loc, condition, choices.left, choices.right);
   }, "expandTernaryOperators"),
   /* @__PURE__ */ __name(async function createKeywordArguments(ast, parent = null) {
-    if (!isinstance(ast, BinaryOp) || ast.op !== ":") return ast.pipe((e) => createKeywordArguments(e, ast));
-    const name = await ast.left.pipe((e) => createKeywordArguments(e));
-    const value = await ast.right.pipe((e) => createKeywordArguments(e));
+    ast = await ast.pipe((e) => createKeywordArguments(e, ast));
+    if (!isinstance(ast, BinaryOp) || ast.op !== ":") return ast;
+    const name = ast.left;
+    const value = ast.right;
     if (!isinstance(name, Name)) {
       throw isinstance(parent, Call) ? new ParseError('expected name before ":"', name.edgemost(false).loc) : new ParseError('unexpected ":"', ast.loc);
     }
@@ -1666,11 +1698,13 @@ export {
   __name,
   Opcode,
   TAU,
+  sqrt,
   sin,
   cos,
   sgn,
   abs,
   tan,
+  tanW,
   saw,
   tri,
   noise3,
@@ -1700,6 +1734,7 @@ export {
   LateBinding,
   Call,
   List,
+  Mapping,
   Definition,
   ParameterDescriptor,
   Template,
@@ -1707,7 +1742,6 @@ export {
   UnaryOp,
   DefaultPlaceholder,
   KeywordArgument,
-  Mapping,
   Conditional,
   InterpolatedValue,
   SplatValue,
@@ -1717,4 +1751,4 @@ export {
   ast_exports,
   parse
 };
-//# sourceMappingURL=chunk-Y5AIDCJX.js.map
+//# sourceMappingURL=chunk-NGNJHJ5L.js.map

@@ -256,7 +256,24 @@ describe("operations", () => {
             ]
         });
     });
-
+    test("indexing list", async () => {
+        await expectEval("[1, 2, 3]->a", dummyState, {
+            __class__: AST.Value,
+            value: 2
+        });
+    });
+    test("indexing matrix", async () => {
+        await expectEval("[[1, 2, 3], [4, 5, 6]]->a->b", dummyState, {
+            __class__: AST.Value,
+            value: 6
+        });
+    });
+    test("indexing mapping", async () => {
+        await expectEval("[.foo => 1, .bar => 3]->.foo", dummyState, {
+            __class__: AST.Value,
+            value: 1
+        });
+    });
 });
 describe("name resolution", () => {
     test("looking up node names", async () => {

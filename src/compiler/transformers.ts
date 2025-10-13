@@ -150,9 +150,10 @@ const TRANSFORM_PASSES = [
     },
 
     async function expandAssignments(ast: AST.Node): Promise<AST.Node> {
-        if (!isinstance(ast, AST.BinaryOp) || (ast.op !== "=" && !ast.assign)) return ast.pipe(expandAssignments);
-        const target = await ast.left.pipe(expandAssignments);
-        var body = await ast.right.pipe(expandAssignments);
+        ast = await ast.pipe(expandAssignments);
+        if (!isinstance(ast, AST.BinaryOp) || (ast.op !== "=" && !ast.assign)) return ast;
+        const target = ast.left;
+        var body = ast.right;
         if (ast.assign) {
             body = new AST.BinaryOp(ast.loc, ast.op, target, body);
         }
@@ -160,9 +161,11 @@ const TRANSFORM_PASSES = [
     },
 
     async function expandTernaryOperators(ast: AST.Node): Promise<AST.Node> {
-        if (!isinstance(ast, AST.BinaryOp) || ast.op !== "?") return ast.pipe(expandTernaryOperators);
-        const condition = await ast.left.pipe(expandTernaryOperators);
-        const choices = await ast.right.pipe(expandTernaryOperators);
+        // ... this needs work to support a?b?c:d:e and a?b:c?d:e constructs
+        ast = await ast.pipe(expandTernaryOperators);
+        if (!isinstance(ast, AST.BinaryOp) || ast.op !== "?") return ast;
+        const condition = ast.left;
+        const choices = ast.right;
         if (!isinstance(choices, AST.BinaryOp) || choices.op !== ":") {
             throw new ParseError('expected ":" after expression', (isinstance(choices, AST.BinaryOp) ? choices : choices.edgemost(false)).loc, [new ErrorNote('note: "?" is here:', ast.loc)]);
         }
@@ -170,9 +173,10 @@ const TRANSFORM_PASSES = [
     },
 
     async function createKeywordArguments(ast: AST.Node, parent: AST.Node | null = null): Promise<AST.Node> {
-        if (!isinstance(ast, AST.BinaryOp) || ast.op !== ":") return ast.pipe(e => createKeywordArguments(e, ast));
-        const name = await ast.left.pipe(e => createKeywordArguments(e));
-        const value = await ast.right.pipe(e => createKeywordArguments(e));
+        ast = await ast.pipe(e => createKeywordArguments(e, ast));
+        if (!isinstance(ast, AST.BinaryOp) || ast.op !== ":") return ast;
+        const name = ast.left;
+        const value = ast.right;
         if (!isinstance(name, AST.Name)) {
             throw (isinstance(parent, AST.Call)
                 ? new ParseError('expected name before ":"', name.edgemost(false).loc)

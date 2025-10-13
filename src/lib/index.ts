@@ -2,7 +2,7 @@ import * as AST from "../compiler/ast";
 import { EvalState, NodeDef, NodeHelp } from "../compiler/evalState";
 import { CompiledVoiceData, Opcode } from "../compiler/prog";
 import { ast as lib, sources } from "./index.syd";
-import { bitcrusher, bitcrusherHelp, delay, delayHelp, zzfxFilter, zzfxFilterHelp } from "./nodes/effects";
+import { bitcrusher, bitcrusherHelp, delay, delayHelp, filter, filterHelp } from "./nodes/effects";
 import { zzfxOscillator, zzfxOscillatorHelp } from "./nodes/generators";
 import { clock, clockHelp, integrator, integratorHelp, shimmered, shimmeredHelp } from "./nodes/logic";
 export { sources as libSrc };
@@ -10,7 +10,7 @@ export { sources as libSrc };
 export function nodes(): NodeDef[] {
     return [
         zzfxOscillator,
-        zzfxFilter,
+        filter,
         bitcrusher,
         delay,
         shimmered,
@@ -54,7 +54,7 @@ export function passthroughFx(): CompiledVoiceData {
 export function nodeHelp(): Record<string, NodeHelp> {
     return {
         zzfxOscillator: zzfxOscillatorHelp,
-        zzfxFilter: zzfxFilterHelp,
+        filterHelp: filterHelp,
         bitcrusher: bitcrusherHelp,
         delay: delayHelp,
         shimmered: shimmeredHelp,

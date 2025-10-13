@@ -1,13 +1,13 @@
 import {
   nodes,
   passthroughFx
-} from "./chunk-SAXBY6KL.js";
+} from "./chunk-L5ME2NEO.js";
 import {
   OPERATORS,
   __name,
   isArray,
   isNumber
-} from "./chunk-Y5AIDCJX.js";
+} from "./chunk-NGNJHJ5L.js";
 
 // src/runtime/automation.ts
 var AutomatedValue = class {
@@ -35,6 +35,9 @@ var AutomatedValue = class {
     }
     this.target = newValue;
     this.timeLeft = time;
+    if (time === 0) {
+      this.value = newValue;
+    }
   }
   /** HOT CODE */
   update(dt) {
@@ -134,41 +137,49 @@ var Tone = class {
           a = pop();
           peek().push(...a);
           break;
-        case 10 /* DO_BINARY_OP */:
-        case 11 /* DO_BINARY_OP_STEREO */:
+        case 10 /* PUSH_FRESH_EMPTY_MAP */:
+          push({});
+          break;
+        case 11 /* ADD_TO_MAP */:
+          c = pop();
+          b = pop();
+          peek()[b] = c;
+          break;
+        case 12 /* DO_BINARY_OP */:
+        case 13 /* DO_BINARY_OP_STEREO */:
           b = pop();
           a = pop();
           c = OPERATORS[code[1]].cb;
-          push(op === 10 /* DO_BINARY_OP */ ? c(a, b) : stereo(c(a[0], b[0]), c(a[1], b[1])));
+          push(op === 12 /* DO_BINARY_OP */ ? c(a, b) : stereo(c(a[0], b[0]), c(a[1], b[1])));
           break;
-        case 12 /* DO_UNARY_OP */:
-        case 13 /* DO_UNARY_OP_STEREO */:
+        case 14 /* DO_UNARY_OP */:
+        case 15 /* DO_UNARY_OP_STEREO */:
           a = pop();
           c = OPERATORS[code[1]].cu;
-          push(op === 12 /* DO_UNARY_OP */ ? c(a) : stereo(c(a[0]), c(a[1])));
+          push(op === 14 /* DO_UNARY_OP */ ? c(a) : stereo(c(a[0]), c(a[1])));
           break;
-        case 14 /* GET_REGISTER */:
+        case 16 /* GET_REGISTER */:
           push(registers[code[1]]);
           break;
-        case 15 /* TAP_REGISTER */:
+        case 17 /* TAP_REGISTER */:
           registers[code[1]] = peek();
           break;
-        case 16 /* SHIFT_REGISTER */:
+        case 18 /* SHIFT_REGISTER */:
           a = registers[code[1]];
           registers[code[1]] = pop();
           push(a);
           break;
-        case 17 /* CONDITIONAL_SELECT */:
+        case 19 /* CONDITIONAL_SELECT */:
           c = pop();
           b = pop();
           a = pop();
           push(c ? b : a);
           break;
-        case 18 /* STEREO_DOUBLE_WIDEN */:
+        case 20 /* STEREO_DOUBLE_WIDEN */:
           a = pop();
           push(stereo(a, a));
           break;
-        case 19 /* APPLY_NODE */:
+        case 21 /* APPLY_NODE */:
           a = code[1];
           i = args.length = code[2];
           while (i > 0) {
@@ -177,10 +188,10 @@ var Tone = class {
           }
           push(nodes2[a](this.dt, args));
           break;
-        case 21 /* GET_MOD */:
+        case 23 /* GET_MOD */:
           push(this.mods[code[1]]?.value ?? 0);
           break;
-        case 20 /* APPLY_DOUBLE_NODE_STEREO */:
+        case 22 /* APPLY_DOUBLE_NODE_STEREO */:
           a = code[1];
           b = code[2];
           i = args.length = argsL.length = argsR.length = c = code[3];

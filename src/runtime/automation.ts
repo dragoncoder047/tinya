@@ -19,7 +19,9 @@ export class AutomatedValue {
     }
     goto(newValue: number, dt: number, time: number) {
         switch (this.mode) {
-            case AutomatedValueMethod.LINEAR: this.delta = dt * (newValue - this.value) / time; break;
+            case AutomatedValueMethod.LINEAR:
+                this.delta = dt * (newValue - this.value) / time;
+                break;
             case AutomatedValueMethod.EXPONENTIAL:
                 if ((this.value * newValue) <= 0) {
                     throw new Error("cannot cross 0 when in exponential mode");
@@ -28,6 +30,9 @@ export class AutomatedValue {
         }
         this.target = newValue;
         this.timeLeft = time;
+        if (time === 0) {
+            this.value = newValue;
+        }
     }
     /** HOT CODE */
     update(dt: number) {
